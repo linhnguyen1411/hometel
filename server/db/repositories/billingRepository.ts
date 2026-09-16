@@ -382,4 +382,38 @@ export class BillingRepository {
     const stmt = db.prepare(query);
     return stmt.all(...params) as (PaymentRow & { invoice_number: string; tenant_name: string; company_name: string })[];
   }
+
+  static reconcileOverdueInvoices(companyId?: string, asOfDate?: string): { updatedCount: number; invoiceIds: string[] } {
+    const db = getDatabase();
+    const targetDate = asOfDate || new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+
+    let selectQuery = `
+      SELECT id FROM invoices
+      WHERE status IN ('ISSUED', 'PARTIALLY_PAID')
+      AND due_date < ?
+      AND outstanding_amount > 0
+    `;
+    const params: string[] = [targetDate];
+    if (companyId) {
+      selectQuery += ' AND company_id = ?';
+      params.push(companyId);
+    }
+
+    const rows = db.prepare(selectQuery).all(...params) as { id: string }[];
+    if (rows.length === 0) {
+      return { updatedCount: 0, invoiceIds: [] };
+    }
+
+    const ids = rows.map(r => r.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const updateStmt = db.prepare(`
+      UPDATE invoices
+      SET status = 'OVERDUE', updated_at = ?
+      WHERE id IN (${placeholders})
+    `);
+    updateStmt.run(now, ...ids);
+
+    return { updatedCount: ids.length, invoiceIds: ids };
+  }
 }

@@ -1,8 +1,13 @@
 import crypto from 'node:crypto';
-import { getDatabase, withTransaction } from '../db/connection.js';
+import { withTransaction } from '../db/connection.js';
 import { TokenPayload } from './authService.js';
 import { NotificationRepository } from '../db/repositories/notificationRepository.js';
 import { AuditRepository } from '../db/repositories/auditRepository.js';
+import { OperationsRepository } from '../db/repositories/operationsRepository.js';
+import { BillingRepository } from '../db/repositories/billingRepository.js';
+import { BuildingRepository } from '../db/repositories/buildingRepository.js';
+import { RentalRepository } from '../db/repositories/rentalRepository.js';
+import { ServiceRepository } from '../db/repositories/serviceRepository.js';
 
 export interface ActionItem {
   id: string;
@@ -37,20 +42,13 @@ export class OperationalService {
    * Helper: Resolve company IDs for an authenticated user
    */
   private static getCompanyIdsForUser(auth: TokenPayload): string[] {
-    const db = getDatabase();
-    if (auth.role === 'SUPER_ADMIN') {
-      const all = db.prepare('SELECT id FROM companies WHERE status = "ACTIVE"').all() as any[];
-      return all.map(c => c.id);
-    }
-    const mems = db.prepare('SELECT company_id FROM company_memberships WHERE user_id = ? AND status = "ACTIVE"').all(auth.userId) as any[];
-    return mems.map(m => m.company_id);
+    return OperationsRepository.getUserCompanyIds(auth.userId, auth.role);
   }
 
   /**
    * 1. TODAY OPERATIONAL COCKPIT
    */
   static getTodayCockpit(auth: TokenPayload) {
-    const db = getDatabase();
     const companyIds = this.getCompanyIdsForUser(auth);
     if (companyIds.length === 0) {
       return {
@@ -62,31 +60,18 @@ export class OperationalService {
       };
     }
 
-    const compPlaceholders = companyIds.map(() => '?').join(',');
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
     // Check dismissed or snoozed actions
-    const dismissedRows = db.prepare(`
-      SELECT action_key FROM action_dismissals 
-      WHERE dismissed_until IS NULL OR dismissed_until > ?
-    `).all(todayStr) as { action_key: string }[];
-    const dismissedKeys = new Set(dismissedRows.map(r => r.action_key));
+    const dismissedKeys = OperationsRepository.getActiveDismissals(todayStr);
 
     const criticalActions: ActionItem[] = [];
     const attentionActions: ActionItem[] = [];
     const upcomingActions: ActionItem[] = [];
 
     // --- A. INVOICES (Overdue & Due Soon) ---
-    const invoices = db.prepare(`
-      SELECT i.*, r.room_number, b.name as building_name, b.id as building_id, u.full_name as tenant_name, u.phone as tenant_phone
-      FROM invoices i
-      JOIN rooms r ON i.room_id = r.id
-      JOIN buildings b ON r.building_id = b.id
-      JOIN users u ON i.tenant_id = u.id
-      WHERE i.company_id IN (${compPlaceholders})
-      AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
-    `).all(...companyIds) as any[];
+    const invoices = OperationsRepository.getCockpitInvoices(companyIds);
 
     for (const inv of invoices) {
       const isOverdue = inv.status === 'OVERDUE' || inv.due_date < todayStr;
@@ -158,17 +143,7 @@ export class OperationalService {
     }
 
     // --- B. SERVICE REQUESTS / MAINTENANCE ---
-    const serviceRequests = db.prepare(`
-      SELECT sr.*, r.room_number, b.name as building_name, b.id as building_id, u.full_name as tenant_name, u.phone as tenant_phone,
-             s.name as service_name
-      FROM service_requests sr
-      LEFT JOIN rooms r ON sr.room_id = r.id
-      LEFT JOIN buildings b ON r.building_id = b.id
-      LEFT JOIN users u ON sr.tenant_id = u.id
-      LEFT JOIN services s ON sr.service_id = s.id
-      WHERE (sr.provider_company_id IN (${compPlaceholders}) OR r.building_id IN (SELECT id FROM buildings WHERE company_id IN (${compPlaceholders})))
-      AND sr.status IN ('PENDING', 'APPROVED', 'ASSIGNED', 'IN_PROGRESS')
-    `).all(...companyIds, ...companyIds) as any[];
+    const serviceRequests = OperationsRepository.getCockpitServiceRequests(companyIds);
 
     for (const sr of serviceRequests) {
       const isUrgent = sr.urgency === 'EMERGENCY' || sr.urgency === 'HIGH';
@@ -229,15 +204,7 @@ export class OperationalService {
     }
 
     // --- C. CONTRACTS (Expiring within 30 days) ---
-    const contracts = db.prepare(`
-      SELECT c.*, r.room_number, b.name as building_name, b.id as building_id, u.full_name as tenant_name, u.phone as tenant_phone
-      FROM rental_contracts c
-      JOIN rooms r ON c.room_id = r.id
-      JOIN buildings b ON r.building_id = b.id
-      JOIN users u ON c.tenant_id = u.id
-      WHERE c.company_id IN (${compPlaceholders})
-      AND c.status IN ('ACTIVE', 'EXPIRING')
-    `).all(...companyIds) as any[];
+    const contracts = OperationsRepository.getCockpitContracts(companyIds);
 
     for (const ctr of contracts) {
       const daysLeft = Math.ceil((new Date(ctr.end_date).getTime() - now.getTime()) / (1000 * 3600 * 24));
@@ -300,15 +267,7 @@ export class OperationalService {
     }
 
     // --- D. RENTAL APPLICATIONS (Pending) ---
-    const pendingApps = db.prepare(`
-      SELECT a.*, r.room_number, b.name as building_name, b.id as building_id, u.full_name as tenant_name, u.phone as tenant_phone
-      FROM rental_applications a
-      JOIN rooms r ON a.room_id = r.id
-      JOIN buildings b ON r.building_id = b.id
-      JOIN users u ON a.tenant_id = u.id
-      WHERE b.company_id IN (${compPlaceholders})
-      AND a.status = 'PENDING'
-    `).all(...companyIds) as any[];
+    const pendingApps = OperationsRepository.getCockpitPendingApplications(companyIds);
 
     for (const app of pendingApps) {
       const actionKey = `pending_app_${app.id}`;
@@ -341,14 +300,7 @@ export class OperationalService {
     }
 
     // --- E. EQUIPMENT NEEDING REPAIR ---
-    const faultyEquipment = db.prepare(`
-      SELECT eq.*, r.room_number, b.name as building_name, b.id as building_id
-      FROM equipment eq
-      JOIN rooms r ON eq.room_id = r.id
-      JOIN buildings b ON r.building_id = b.id
-      WHERE b.company_id IN (${compPlaceholders})
-      AND eq.condition = 'NEEDS_REPAIR'
-    `).all(...companyIds) as any[];
+    const faultyEquipment = OperationsRepository.getCockpitFaultyEquipment(companyIds);
 
     for (const eq of faultyEquipment) {
       const actionKey = `faulty_eq_${eq.id}`;
@@ -379,25 +331,13 @@ export class OperationalService {
     }
 
     // --- F. HEALTHY SUMMARY CALCULATION ---
-    const allRooms = db.prepare(`
-      SELECT r.id, r.status, b.company_id
-      FROM rooms r
-      JOIN buildings b ON r.building_id = b.id
-      WHERE b.company_id IN (${compPlaceholders})
-    `).all(...companyIds) as any[];
+    const allRooms = OperationsRepository.getCockpitRooms(companyIds);
 
     const totalUnits = allRooms.length;
     const occupiedUnits = allRooms.filter(r => r.status === 'OCCUPIED').length;
     const availableUnits = allRooms.filter(r => r.status === 'AVAILABLE').length;
 
-    const invoiceStats = db.prepare(`
-      SELECT 
-        SUM(total) as total_billed,
-        SUM(paid_amount) as total_collected,
-        SUM(outstanding_amount) as total_outstanding
-      FROM invoices
-      WHERE company_id IN (${compPlaceholders})
-    `).get(...companyIds) as any;
+    const invoiceStats = OperationsRepository.getCockpitInvoiceStats(companyIds);
 
     const totalBilled = invoiceStats?.total_billed || 0;
     const totalCollected = invoiceStats?.total_collected || 0;
@@ -412,19 +352,16 @@ export class OperationalService {
         occupiedUnits,
         availableUnits,
         occupancyRate: totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0,
-        totalBilled,
-        totalCollected,
-        totalOutstanding: invoiceStats?.total_outstanding || 0,
         collectionRate,
-        criticalCount: criticalActions.length,
-        attentionCount: attentionActions.length
+        monthlyRevenue: totalCollected,
+        outstandingDebt: invoiceStats?.total_outstanding || 0
       },
       timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * 2. EXECUTE QUICK ACTION
+   * 2. ACTION CENTER: Execute Quick Actions
    */
   static executeQuickAction(
     auth: TokenPayload,
@@ -432,17 +369,15 @@ export class OperationalService {
     actionType: string,
     payload: any = {}
   ) {
-    const db = getDatabase();
     const now = new Date().toISOString();
 
     return withTransaction(() => {
       if (actionType === 'remind_tenant') {
-        // Find invoice or tenant
         const invId = payload.invoiceId || payload.entityId;
-        const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invId) as any;
+        const invoice = BillingRepository.findInvoiceById(invId);
         if (!invoice) throw new Error('INVOICE_NOT_FOUND');
 
-        const room = db.prepare('SELECT room_number FROM rooms WHERE id = ?').get(invoice.room_id) as any;
+        const room = BuildingRepository.findRoomById(invoice.room_id);
         const msg = `Kính gửi cư dân, hóa đơn phòng ${room?.room_number || ''} tháng ${invoice.billing_month} với số tiền ${(invoice.outstanding_amount || invoice.total).toLocaleString()} VND đã quá hạn. Vui lòng thanh toán sớm để đảm bảo quyền lợi dịch vụ.`;
 
         NotificationRepository.create({
@@ -470,7 +405,7 @@ export class OperationalService {
 
       if (actionType === 'renew_contract') {
         const contractId = payload.contractId || payload.entityId;
-        const contract = db.prepare('SELECT * FROM rental_contracts WHERE id = ?').get(contractId) as any;
+        const contract = RentalRepository.findContractById(contractId);
         if (!contract) throw new Error('CONTRACT_NOT_FOUND');
 
         // Extend by 12 months from end_date
@@ -478,11 +413,10 @@ export class OperationalService {
         currentEnd.setFullYear(currentEnd.getFullYear() + 1);
         const newEndDate = currentEnd.toISOString().split('T')[0];
 
-        db.prepare(`
-          UPDATE rental_contracts 
-          SET end_date = ?, status = 'ACTIVE', updated_at = ?
-          WHERE id = ?
-        `).run(newEndDate, now, contractId);
+        RentalRepository.updateContract(contractId, {
+          end_date: newEndDate,
+          status: 'ACTIVE'
+        });
 
         NotificationRepository.create({
           id: 'notif_' + crypto.randomUUID().substring(0, 8),
@@ -511,32 +445,16 @@ export class OperationalService {
       if (actionType === 'assign_technician') {
         const srId = payload.serviceRequestId || payload.entityId;
         const staffId = payload.staffId;
-        const sr = db.prepare('SELECT * FROM service_requests WHERE id = ?').get(srId) as any;
+        const sr = ServiceRepository.findRequestById(srId);
         if (!sr) throw new Error('SERVICE_REQUEST_NOT_FOUND');
 
-        // Pick staff if not specified
         let chosenStaffId = staffId;
         if (!chosenStaffId) {
-          const availableStaff = db.prepare(`
-            SELECT user_id FROM company_memberships 
-            WHERE role = 'STAFF' AND status = 'ACTIVE'
-            LIMIT 1
-          `).get() as any;
-          chosenStaffId = availableStaff?.user_id || auth.userId;
+          chosenStaffId = OperationsRepository.findAvailableStaff(sr.provider_company_id) || auth.userId;
         }
 
-        db.prepare(`
-          UPDATE service_requests
-          SET status = 'ASSIGNED', updated_at = ?
-          WHERE id = ?
-        `).run(now, srId);
-
         const assignmentId = 'asg_' + crypto.randomUUID().substring(0, 8);
-        db.prepare(`
-          INSERT INTO service_assignments (id, service_request_id, staff_id, assigned_at, status)
-          VALUES (?, ?, ?, ?, 'ASSIGNED')
-          ON CONFLICT(id) DO UPDATE SET staff_id = excluded.staff_id, status = 'ASSIGNED'
-        `).run(assignmentId, srId, chosenStaffId, now);
+        OperationsRepository.assignServiceRequest(assignmentId, srId, chosenStaffId, now);
 
         // Notify staff and tenant
         NotificationRepository.create({
@@ -568,21 +486,25 @@ export class OperationalService {
         snoozeDate.setDate(snoozeDate.getDate() + days);
         const untilStr = snoozeDate.toISOString().split('T')[0];
 
-        db.prepare(`
-          INSERT INTO action_dismissals (id, action_key, dismissed_until, reason, created_at)
-          VALUES (?, ?, ?, 'Snoozed by user', ?)
-          ON CONFLICT(action_key) DO UPDATE SET dismissed_until = excluded.dismissed_until
-        `).run('dsm_' + crypto.randomUUID().substring(0, 8), actionKey, untilStr, now);
+        OperationsRepository.upsertDismissal(
+          'dsm_' + crypto.randomUUID().substring(0, 8),
+          actionKey,
+          untilStr,
+          'Snoozed by user',
+          now
+        );
 
         return { success: true, message: `Đã tạm ẩn việc này đến ngày ${untilStr}.` };
       }
 
       if (actionType === 'dismiss') {
-        db.prepare(`
-          INSERT INTO action_dismissals (id, action_key, dismissed_until, reason, created_at)
-          VALUES (?, ?, NULL, 'Dismissed permanently', ?)
-          ON CONFLICT(action_key) DO UPDATE SET dismissed_until = NULL
-        `).run('dsm_' + crypto.randomUUID().substring(0, 8), actionKey, now);
+        OperationsRepository.upsertDismissal(
+          'dsm_' + crypto.randomUUID().substring(0, 8),
+          actionKey,
+          null,
+          'Dismissed permanently',
+          now
+        );
 
         return { success: true, message: 'Đã bỏ qua mục hành động này.' };
       }
@@ -595,36 +517,12 @@ export class OperationalService {
    * 3. BUILDING 360 OPERATIONAL VIEW
    */
   static getBuilding360(buildingId: string) {
-    const db = getDatabase();
-
-    const building = db.prepare(`
-      SELECT b.*, c.name as company_name, c.phone as company_phone, c.email as company_email
-      FROM buildings b
-      JOIN companies c ON b.company_id = c.id
-      WHERE b.id = ?
-    `).get(buildingId) as any;
+    const building = OperationsRepository.getBuildingDetail(buildingId);
     if (!building) throw new Error('BUILDING_NOT_FOUND');
 
-    const floors = db.prepare(`
-      SELECT * FROM floors WHERE building_id = ? ORDER BY floor_number ASC
-    `).all(buildingId) as any[];
-
+    const floors = OperationsRepository.getFloorsByBuilding(buildingId);
     const todayStr = new Date().toISOString().split('T')[0];
-
-    const rooms = db.prepare(`
-      SELECT r.*, f.floor_number,
-             (SELECT u.full_name FROM rental_contracts c JOIN users u ON c.tenant_id = u.id WHERE c.room_id = r.id AND c.status = 'ACTIVE' LIMIT 1) as tenant_name,
-             (SELECT u.phone FROM rental_contracts c JOIN users u ON c.tenant_id = u.id WHERE c.room_id = r.id AND c.status = 'ACTIVE' LIMIT 1) as tenant_phone,
-             (SELECT c.id FROM rental_contracts c WHERE c.room_id = r.id AND c.status = 'ACTIVE' LIMIT 1) as active_contract_id,
-             (SELECT c.contract_number FROM rental_contracts c WHERE c.room_id = r.id AND c.status = 'ACTIVE' LIMIT 1) as contract_number,
-             (SELECT c.end_date FROM rental_contracts c WHERE c.room_id = r.id AND c.status = 'ACTIVE' LIMIT 1) as contract_end_date,
-             (SELECT COUNT(*) FROM invoices i WHERE i.room_id = r.id AND (i.status = 'OVERDUE' OR (i.status IN ('ISSUED', 'PARTIALLY_PAID') AND i.due_date < '${todayStr}'))) as overdue_count,
-             (SELECT COUNT(*) FROM service_requests sr WHERE sr.room_id = r.id AND sr.status IN ('PENDING', 'ASSIGNED', 'IN_PROGRESS') AND sr.urgency IN ('HIGH', 'EMERGENCY')) as critical_issues_count
-      FROM rooms r
-      JOIN floors f ON r.floor_id = f.id
-      WHERE r.building_id = ?
-      ORDER BY f.floor_number ASC, r.room_number ASC
-    `).all(buildingId) as any[];
+    const rooms = OperationsRepository.getRoomsWithHealthData(buildingId, todayStr);
 
     // Compute Health Status for each room for Visual Room Map
     const mappedRooms = rooms.map(r => {
@@ -665,15 +563,7 @@ export class OperationalService {
     }));
 
     // Financial Metrics for this building
-    const financialStats = db.prepare(`
-      SELECT 
-        SUM(total) as total_billed,
-        SUM(paid_amount) as total_collected,
-        SUM(outstanding_amount) as total_outstanding
-      FROM invoices i
-      JOIN rooms r ON i.room_id = r.id
-      WHERE r.building_id = ?
-    `).get(buildingId) as any;
+    const financialStats = OperationsRepository.getBuildingFinancialStats(buildingId);
 
     const totalRooms = mappedRooms.length;
     const occupiedRooms = mappedRooms.filter(r => r.status === 'OCCUPIED').length;
@@ -683,21 +573,10 @@ export class OperationalService {
     const criticalRooms = mappedRooms.filter(r => r.healthStatus === 'CRITICAL').length;
 
     // Open work orders
-    const openWorkOrders = db.prepare(`
-      SELECT COUNT(*) as count 
-      FROM service_requests sr
-      JOIN rooms r ON sr.room_id = r.id
-      WHERE r.building_id = ? AND sr.status IN ('PENDING', 'APPROVED', 'ASSIGNED', 'IN_PROGRESS')
-    `).get(buildingId) as any;
+    const openWorkOrdersCount = OperationsRepository.getBuildingOpenWorkOrders(buildingId);
 
     // Recent activity feed for this building
-    const recentActivity = db.prepare(`
-      SELECT al.*, u.full_name as actor_name
-      FROM audit_logs al
-      LEFT JOIN users u ON al.actor_id = u.id
-      ORDER BY al.created_at DESC
-      LIMIT 10
-    `).all() as any[];
+    const recentActivity = OperationsRepository.getRecentActivity(10);
 
     return {
       building,
@@ -713,7 +592,7 @@ export class OperationalService {
         totalCollected: financialStats?.total_collected || 0,
         totalOutstanding: financialStats?.total_outstanding || 0,
         collectionRate: financialStats?.total_billed > 0 ? Math.round((financialStats.total_collected / financialStats.total_billed) * 100) : 100,
-        openWorkOrdersCount: openWorkOrders?.count || 0
+        openWorkOrdersCount
       },
       floors: floorsWithRooms,
       recentActivity
@@ -724,15 +603,7 @@ export class OperationalService {
    * 4. ROOM 360 OPERATIONAL VIEW
    */
   static getRoom360(roomId: string) {
-    const db = getDatabase();
-
-    const room = db.prepare(`
-      SELECT r.*, f.floor_number, f.name as floor_name, b.name as building_name, b.address as building_address, b.city as building_city
-      FROM rooms r
-      JOIN floors f ON r.floor_id = f.id
-      JOIN buildings b ON r.building_id = b.id
-      WHERE r.id = ?
-    `).get(roomId) as any;
+    const room = OperationsRepository.getRoomDetailWithContext(roomId);
     if (!room) throw new Error('ROOM_NOT_FOUND');
 
     // Parse JSON
@@ -745,56 +616,25 @@ export class OperationalService {
     }
 
     // Active Contract
-    const activeContract = db.prepare(`
-      SELECT c.*, u.full_name as tenant_name, u.email as tenant_email, u.phone as tenant_phone, u.avatar_url as tenant_avatar
-      FROM rental_contracts c
-      JOIN users u ON c.tenant_id = u.id
-      WHERE c.room_id = ? AND c.status IN ('ACTIVE', 'EXPIRING', 'PENDING')
-      ORDER BY c.created_at DESC
-      LIMIT 1
-    `).get(roomId) as any;
+    const activeContract = OperationsRepository.getRoomActiveContract(roomId);
 
     // Deposit for active contract
     let deposit = null;
     if (activeContract) {
-      deposit = db.prepare('SELECT * FROM deposits WHERE contract_id = ?').get(activeContract.id) as any;
+      deposit = OperationsRepository.getDepositForContract(activeContract.id);
     }
 
     // Equipment
-    const equipment = db.prepare(`
-      SELECT * FROM equipment WHERE room_id = ? ORDER BY name ASC
-    `).all(roomId) as any[];
+    const equipment = OperationsRepository.getEquipmentForRoom(roomId);
 
     // Meters & Latest Readings
-    const meters = db.prepare(`
-      SELECT m.*,
-             (SELECT consumption FROM meter_readings mr WHERE mr.meter_id = m.id ORDER BY mr.created_at DESC LIMIT 1) as last_consumption,
-             (SELECT reading_date FROM meter_readings mr WHERE mr.meter_id = m.id ORDER BY mr.created_at DESC LIMIT 1) as last_reading_date
-      FROM meters m
-      WHERE m.room_id = ?
-    `).all(roomId) as any[];
+    const meters = OperationsRepository.getMetersForRoom(roomId);
 
     // Invoices
-    const invoices = db.prepare(`
-      SELECT i.*, 
-             (SELECT COUNT(*) FROM invoice_items itm WHERE itm.invoice_id = i.id) as item_count
-      FROM invoices i
-      WHERE i.room_id = ?
-      ORDER BY i.issue_date DESC
-      LIMIT 12
-    `).all(roomId) as any[];
+    const invoices = OperationsRepository.getInvoicesForRoom(roomId, 12);
 
     // Service Requests
-    const serviceRequests = db.prepare(`
-      SELECT sr.*, s.name as service_name, s.category as service_category,
-             sa.staff_id, u.full_name as technician_name
-      FROM service_requests sr
-      LEFT JOIN services s ON sr.service_id = s.id
-      LEFT JOIN service_assignments sa ON sa.service_request_id = sr.id
-      LEFT JOIN users u ON sa.staff_id = u.id
-      WHERE sr.room_id = ?
-      ORDER BY sr.created_at DESC
-    `).all(roomId) as any[];
+    const serviceRequests = OperationsRepository.getServiceRequestsForRoom(roomId);
 
     // Synthesize Chronological Room Timeline
     const timeline: any[] = [];
@@ -871,86 +711,17 @@ export class OperationalService {
       return { rooms: [], tenants: [], buildings: [], contracts: [], invoices: [], serviceRequests: [], equipment: [] };
     }
 
-    const db = getDatabase();
-    const q = `%${query.trim()}%`;
     const companyIds = this.getCompanyIdsForUser(auth);
-    const compPlaceholders = companyIds.map(() => '?').join(',');
-
-    // Rooms
-    const rooms = db.prepare(`
-      SELECT r.id, r.room_number, r.status, r.base_rent, b.name as building_name, b.id as building_id
-      FROM rooms r
-      JOIN buildings b ON r.building_id = b.id
-      WHERE (r.room_number LIKE ? OR r.description LIKE ?)
-      ${companyIds.length > 0 ? `AND b.company_id IN (${compPlaceholders})` : ''}
-      LIMIT 5
-    `).all(q, q, ...(companyIds.length > 0 ? companyIds : [])) as any[];
-
-    // Tenants
-    const tenants = db.prepare(`
-      SELECT u.id, u.full_name, u.email, u.phone, u.avatar_url
-      FROM users u
-      WHERE u.role = 'TENANT'
-      AND (u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)
-      LIMIT 5
-    `).all(q, q, q) as any[];
-
-    // Buildings
-    const buildings = db.prepare(`
-      SELECT b.id, b.name, b.address, b.city, b.status
-      FROM buildings b
-      WHERE (b.name LIKE ? OR b.address LIKE ?)
-      ${companyIds.length > 0 ? `AND b.company_id IN (${compPlaceholders})` : ''}
-      LIMIT 5
-    `).all(q, q, ...(companyIds.length > 0 ? companyIds : [])) as any[];
-
-    // Contracts
-    const contracts = db.prepare(`
-      SELECT c.id, c.contract_number, c.rent_amount, c.status, r.room_number, u.full_name as tenant_name
-      FROM rental_contracts c
-      JOIN rooms r ON c.room_id = r.id
-      JOIN users u ON c.tenant_id = u.id
-      WHERE c.contract_number LIKE ?
-      ${companyIds.length > 0 ? `AND c.company_id IN (${compPlaceholders})` : ''}
-      LIMIT 5
-    `).all(q, ...(companyIds.length > 0 ? companyIds : [])) as any[];
-
-    // Invoices
-    const invoices = db.prepare(`
-      SELECT i.id, i.invoice_number, i.total, i.status, i.billing_month, r.room_number
-      FROM invoices i
-      JOIN rooms r ON i.room_id = r.id
-      WHERE i.invoice_number LIKE ?
-      ${companyIds.length > 0 ? `AND i.company_id IN (${compPlaceholders})` : ''}
-      LIMIT 5
-    `).all(q, ...(companyIds.length > 0 ? companyIds : [])) as any[];
-
-    // Service Requests
-    const serviceRequests = db.prepare(`
-      SELECT sr.id, sr.title, sr.status, sr.urgency, r.room_number
-      FROM service_requests sr
-      LEFT JOIN rooms r ON sr.room_id = r.id
-      WHERE (sr.title LIKE ? OR sr.description LIKE ?)
-      LIMIT 5
-    `).all(q, q) as any[];
-
-    // Equipment
-    const equipment = db.prepare(`
-      SELECT eq.id, eq.name, eq.serial_number, eq.condition, r.room_number
-      FROM equipment eq
-      JOIN rooms r ON eq.room_id = r.id
-      WHERE (eq.name LIKE ? OR eq.serial_number LIKE ?)
-      LIMIT 5
-    `).all(q, q) as any[];
+    const trimmed = query.trim();
 
     return {
-      rooms,
-      tenants,
-      buildings,
-      contracts,
-      invoices,
-      serviceRequests,
-      equipment
+      rooms: OperationsRepository.searchRooms(trimmed, companyIds),
+      tenants: OperationsRepository.searchTenants(trimmed),
+      buildings: OperationsRepository.searchBuildings(trimmed, companyIds),
+      contracts: OperationsRepository.searchContracts(trimmed, companyIds),
+      invoices: OperationsRepository.searchInvoices(trimmed, companyIds),
+      serviceRequests: OperationsRepository.searchServiceRequests(trimmed),
+      equipment: OperationsRepository.searchEquipment(trimmed)
     };
   }
 
@@ -958,25 +729,14 @@ export class OperationalService {
    * 6. AI INSIGHT LAYER
    */
   static getAiInsights(auth: TokenPayload) {
-    const db = getDatabase();
     const companyIds = this.getCompanyIdsForUser(auth);
     if (companyIds.length === 0) return { insights: [] };
 
-    const compPlaceholders = companyIds.map(() => '?').join(',');
     const insights: any[] = [];
     const todayStr = new Date().toISOString().split('T')[0];
 
     // Insight 1: Overdue Receivable Risk
-    const overdueInvoices = db.prepare(`
-      SELECT i.id, i.invoice_number, i.total, i.outstanding_amount, i.due_date, r.room_number, u.full_name as tenant_name
-      FROM invoices i
-      JOIN rooms r ON i.room_id = r.id
-      JOIN users u ON i.tenant_id = u.id
-      WHERE i.company_id IN (${compPlaceholders})
-      AND (i.status = 'OVERDUE' OR (i.status IN ('ISSUED', 'PARTIALLY_PAID') AND i.due_date < '${todayStr}'))
-      ORDER BY i.due_date ASC
-      LIMIT 3
-    `).all(...companyIds) as any[];
+    const overdueInvoices = OperationsRepository.getOverdueInvoicesForInsights(companyIds, todayStr, 3);
 
     if (overdueInvoices.length > 0) {
       const totalOverdue = overdueInvoices.reduce((sum, inv) => sum + (inv.outstanding_amount || inv.total), 0);
@@ -993,14 +753,7 @@ export class OperationalService {
     }
 
     // Insight 2: Recurring Maintenance / Equipment Deterioration
-    const repeatedMaintenance = db.prepare(`
-      SELECT r.room_number, r.id as room_id, COUNT(*) as req_count
-      FROM service_requests sr
-      JOIN rooms r ON sr.room_id = r.id
-      GROUP BY r.id
-      HAVING req_count >= 2
-      LIMIT 2
-    `).all() as any[];
+    const repeatedMaintenance = OperationsRepository.getRepeatedMaintenance(2);
 
     if (repeatedMaintenance.length > 0) {
       const item = repeatedMaintenance[0];
@@ -1017,15 +770,7 @@ export class OperationalService {
     }
 
     // Insight 3: Lease Renewal Opportunity
-    const expiringSoon = db.prepare(`
-      SELECT c.id, c.contract_number, c.end_date, r.room_number, u.full_name as tenant_name
-      FROM rental_contracts c
-      JOIN rooms r ON c.room_id = r.id
-      JOIN users u ON c.tenant_id = u.id
-      WHERE c.company_id IN (${compPlaceholders})
-      AND c.status IN ('ACTIVE', 'EXPIRING')
-      AND c.end_date BETWEEN '${todayStr}' AND date('${todayStr}', '+30 days')
-    `).all(...companyIds) as any[];
+    const expiringSoon = OperationsRepository.getContractsExpiringWithin30Days(companyIds, todayStr);
 
     if (expiringSoon.length > 0) {
       insights.push({
@@ -1048,7 +793,6 @@ export class OperationalService {
    */
   static aiTriage(description: string, categoryHint?: string) {
     const text = (description + ' ' + (categoryHint || '')).toLowerCase();
-    const db = getDatabase();
 
     let category: 'HVAC' | 'PLUMBING' | 'ELECTRICAL' | 'CLEANING' | 'SECURITY' | 'OTHER' = 'OTHER';
     let urgency: 'LOW' | 'MEDIUM' | 'HIGH' | 'EMERGENCY' = 'MEDIUM';
@@ -1106,15 +850,7 @@ export class OperationalService {
       suggestedChecks = ['Kích nguồn khẩn cấp qua cổng Type-C/9V', 'Kiểm tra độ rơ của khe hở đố cửa'];
     }
 
-    // Match recommended service & provider
-    const recommendedService = db.prepare(`
-      SELECT s.*, c.name as provider_company_name, c.phone as provider_phone
-      FROM services s
-      JOIN companies c ON s.company_id = c.id
-      WHERE s.category = ? AND s.status = 'ACTIVE'
-      ORDER BY s.base_price ASC
-      LIMIT 1
-    `).get(category) as any;
+    const recommendedService = OperationsRepository.getRecommendedService(category);
 
     return {
       category,

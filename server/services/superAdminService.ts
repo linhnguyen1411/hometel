@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { withTransaction, getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/connection.js';
 import { UserRepository, UserRow } from '../db/repositories/userRepository.js';
 import { CompanyRepository, CompanyRow, CompanyMembershipRow } from '../db/repositories/companyRepository.js';
 import { AuditRepository } from '../db/repositories/auditRepository.js';
+import { OperationsRepository } from '../db/repositories/operationsRepository.js';
 
 export interface CreateOwnerDto {
   email: string;
@@ -175,37 +176,6 @@ export class SuperAdminService {
   }
 
   static getSystemStats() {
-    const db = getDatabase();
-
-    const usersCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as any).count;
-    const ownersCount = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'OWNER'").get() as any).count;
-    const providersCount = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'PROVIDER'").get() as any).count;
-    const tenantsCount = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'TENANT'").get() as any).count;
-    const companiesCount = (db.prepare('SELECT COUNT(*) as count FROM companies').get() as any).count;
-    const buildingsCount = (db.prepare('SELECT COUNT(*) as count FROM buildings').get() as any).count;
-    const roomsCount = (db.prepare('SELECT COUNT(*) as count FROM rooms').get() as any).count;
-    const activeContractsCount = (db.prepare("SELECT COUNT(*) as count FROM rental_contracts WHERE status = 'ACTIVE'").get() as any).count;
-
-    const revenueResult = db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE status = 'SUCCESS'").get() as any;
-    const totalRevenue = revenueResult.total;
-
-    const outstandingResult = db.prepare("SELECT COALESCE(SUM(outstanding_amount), 0) as total FROM invoices WHERE status != 'CANCELLED'").get() as any;
-    const totalOutstanding = outstandingResult.total;
-
-    const auditCount = (db.prepare('SELECT COUNT(*) as count FROM audit_logs').get() as any).count;
-
-    return {
-      totalUsers: usersCount,
-      totalOwners: ownersCount,
-      totalProviders: providersCount,
-      totalTenants: tenantsCount,
-      totalCompanies: companiesCount,
-      totalBuildings: buildingsCount,
-      totalRooms: roomsCount,
-      activeContracts: activeContractsCount,
-      totalRevenue,
-      totalOutstanding,
-      auditCount
-    };
+    return OperationsRepository.getSystemStats();
   }
 }

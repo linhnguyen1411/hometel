@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { withTransaction, getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/connection.js';
 import { RentalRepository, RentalApplicationRow, RentalContractRow } from '../db/repositories/rentalRepository.js';
 import { BuildingRepository } from '../db/repositories/buildingRepository.js';
 import { NotificationRepository } from '../db/repositories/notificationRepository.js';

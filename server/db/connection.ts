@@ -42,21 +42,42 @@ export class DatabaseClient {
     return this.instance;
   }
 
-  // Atomic transaction wrapper
+  private static transactionDepth = 0;
+
+  // Atomic transaction wrapper with support for nested calls (via SQLite SAVEPOINTS)
   public static withTransaction<T>(operation: (db: DatabaseSync) => T): T {
     const db = this.getDb();
-    db.exec('BEGIN TRANSACTION;');
+    const depth = this.transactionDepth;
+    const savepointName = `sp_${depth}`;
+
+    if (depth === 0) {
+      db.exec('BEGIN TRANSACTION;');
+    } else {
+      db.exec(`SAVEPOINT ${savepointName};`);
+    }
+    this.transactionDepth++;
+
     try {
       const result = operation(db);
-      db.exec('COMMIT;');
+      if (depth === 0) {
+        db.exec('COMMIT;');
+      } else {
+        db.exec(`RELEASE SAVEPOINT ${savepointName};`);
+      }
       return result;
     } catch (error) {
       try {
-        db.exec('ROLLBACK;');
+        if (depth === 0) {
+          db.exec('ROLLBACK;');
+        } else {
+          db.exec(`ROLLBACK TO SAVEPOINT ${savepointName};`);
+        }
       } catch (rollbackErr) {
         console.error('Error during rollback:', rollbackErr);
       }
       throw error;
+    } finally {
+      this.transactionDepth--;
     }
   }
 }

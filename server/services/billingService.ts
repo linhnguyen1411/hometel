@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { withTransaction, getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/connection.js';
 import { BillingRepository, MeterReadingRow, InvoiceRow, InvoiceItemRow, PaymentRow } from '../db/repositories/billingRepository.js';
 import { BuildingRepository } from '../db/repositories/buildingRepository.js';
 import { RentalRepository } from '../db/repositories/rentalRepository.js';
@@ -255,7 +255,8 @@ export class BillingService {
     const total = taxable + tax;
 
     const invoiceId = 'inv_' + crypto.randomUUID().substring(0, 8);
-    const invoiceNumber = `INV-${room.room_number}-${data.billingMonth.replace('-', '')}`;
+    const suffix = crypto.randomUUID().substring(0, 4).toUpperCase();
+    const invoiceNumber = `INV-${room.room_number}-${data.billingMonth.replace('-', '')}-${suffix}`;
 
     return withTransaction(() => {
       const invoice = BillingRepository.createInvoiceWithItems(
@@ -366,6 +367,39 @@ export class BillingService {
       entity_type: 'PAYMENT',
       entity_id: paymentId
     });
+
+    return result;
+  }
+
+  /**
+   * Automatic or On-demand Debt Reconciliation:
+   * Scans for past-due unpaid or partially-paid invoices and marks them as OVERDUE.
+   */
+  static reconcileDebt(
+    auth: TokenPayload,
+    options?: { companyId?: string; asOfDate?: string }
+  ): { updatedCount: number; invoiceIds: string[] } {
+    const companyId = options?.companyId || auth.memberships[0]?.companyId;
+    if (companyId && !CompanyService.verifyCompanyAccess(auth, companyId)) {
+      throw new Error('FORBIDDEN_COMPANY_ACCESS');
+    }
+
+    const result = BillingRepository.reconcileOverdueInvoices(
+      auth.role === 'SUPER_ADMIN' ? options?.companyId : companyId,
+      options?.asOfDate
+    );
+
+    if (result.updatedCount > 0) {
+      AuditRepository.create({
+        id: 'aud_' + crypto.randomUUID().substring(0, 8),
+        actor_id: auth.userId,
+        actor_email: auth.email,
+        action: 'RECONCILE_OVERDUE_INVOICES',
+        entity_type: 'INVOICE',
+        entity_id: result.invoiceIds.join(','),
+        new_value: JSON.stringify({ count: result.updatedCount, asOfDate: options?.asOfDate })
+      });
+    }
 
     return result;
   }

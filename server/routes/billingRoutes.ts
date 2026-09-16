@@ -191,7 +191,27 @@ invoiceRouter.post('/generate', authenticate, requireRole('OWNER', 'STAFF', 'SUP
 
     return sendSuccess(res, invoice, 201);
   } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN', error.message, 403);
+    }
     return sendError(res, 'GENERATE_INVOICE_FAILED', error.message, 500);
+  }
+});
+
+// POST /api/v1/invoices/reconcile (Reconcile overdue debts)
+invoiceRouter.post('/reconcile', authenticate, requireRole('OWNER', 'STAFF', 'SUPER_ADMIN'), (req: AuthenticatedRequest, res) => {
+  try {
+    const { companyId, asOfDate } = req.body || {};
+    const result = BillingService.reconcileDebt(req.user!, {
+      companyId,
+      asOfDate
+    });
+    return sendSuccess(res, result);
+  } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN', error.message, 403);
+    }
+    return sendError(res, 'RECONCILE_FAILED', error.message, 500);
   }
 });
 
@@ -219,6 +239,9 @@ paymentRouter.post('/', authenticate, (req: AuthenticatedRequest, res) => {
 
     return sendSuccess(res, result, 201);
   } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN', error.message, 403);
+    }
     if (error.message.includes('already fully paid')) {
       return sendError(res, 'ALREADY_PAID', error.message, 409);
     }
