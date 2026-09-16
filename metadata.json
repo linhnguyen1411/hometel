@@ -1,0 +1,7 @@
+{
+  "name": "Homtel",
+  "description": "Homtel - Hệ điều hành tòa nhà thông minh (Building Operating System) với Today Cockpit, Action Center 1-click, Building 360, Room 360 và trung tâm quản trị doanh nghiệp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
