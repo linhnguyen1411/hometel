@@ -215,6 +215,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'payment.confirm': 'Xác nhận thanh toán',
     'payment.processing': 'Đang xử lý...',
     'payment.success': 'Thanh toán thành công! Hóa đơn đã được ghi nhận.',
+    'payment.waiting_for_payment': 'Đang chờ chuyển khoản (tự động nhận diện sau 3s)...',
+    'payment.auto_detect': 'Quét mã VietQR bằng app ngân hàng (Vietcombank, MB, Techcombank, VPBank,...) để hệ thống tự động gạch nợ tức thì.',
 
     // Meter Modal
     'meter.title': 'Ghi chỉ số công tơ & Lập hóa đơn',
@@ -475,7 +477,30 @@ export const translations: Record<Language, Record<string, string>> = {
     'provider.btn_dispatch': 'Điều phối kỹ thuật viên',
     'provider.assigning': 'Đang phân công...',
     'provider.btn_save_service': 'Lưu dịch vụ',
-    'provider.staff_distribution': 'Phân bổ khối lượng công việc nhân viên & kỹ thuật viên'
+    'provider.staff_distribution': 'Phân bổ khối lượng công việc nhân viên & kỹ thuật viên',
+
+    // Phase 2: E-Signature
+    'contract.sign_title': 'Ký Hợp Đồng Điện Tử',
+    'contract.pending_signature': 'Chờ ký kết điện tử',
+    'contract.ready_to_sign': 'Hợp đồng thuê căn hộ của bạn đã sẵn sàng ký kết',
+    'contract.ready_desc': 'Vui lòng hoàn tất ký kết điện tử (chữ ký tay hoặc OTP bảo mật) để kích hoạt quyền lợi cư dân và nhận bàn giao căn hộ.',
+    'contract.sign_now': 'Ký hợp đồng điện tử ngay',
+    'contract.select_method': 'Chọn phương thức ký điện tử',
+    'contract.method_draw': 'Vẽ chữ ký tay',
+    'contract.method_otp': 'Xác thực mã OTP',
+    'contract.draw_instruction': 'Dùng chuột hoặc ngón tay để vẽ chữ ký:',
+    'contract.clear_signature': 'Xóa & Vẽ lại',
+    'contract.sign_here': 'Ký tên tại đây',
+    'contract.otp_desc': 'Mã xác thực bảo mật một lần (OTP) 6 chữ số sẽ được gửi qua Zalo Notification Service / SMS đến số điện thoại của bạn.',
+    'contract.send_otp': 'Gửi mã OTP',
+    'contract.otp_sent_success': 'Mã xác thực OTP đã được gửi thành công!',
+    'contract.legal_notice': 'Bằng việc xác nhận, bạn đồng ý với toàn bộ điều khoản hợp đồng thuê phòng và xác thực chữ ký điện tử có giá trị pháp lý ràng buộc theo Luật Giao dịch Điện tử Việt Nam.',
+    'contract.signing': 'Đang chứng thực...',
+    'contract.confirm_sign': 'Xác nhận Ký kết',
+    'contract.signed_success': 'Hợp đồng đã ký kết thành công!',
+    'contract.certificate_title': 'Chứng Thư Ký Hợp Đồng Điện Tử',
+    'contract.certificate_valid': 'Chứng thư hợp lệ và có giá trị pháp lý',
+    'contract.view_certificate': 'Chứng thư SHA-256'
   },
 
   en: {
@@ -676,6 +701,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'payment.confirm': 'Confirm Payment',
     'payment.processing': 'Processing payment...',
     'payment.success': 'Payment completed successfully! Invoice updated.',
+    'payment.waiting_for_payment': 'Waiting for bank transfer (auto-detected within 3s)...',
+    'payment.auto_detect': 'Scan VietQR with any Vietnamese bank app (Vietcombank, MB, Techcombank, VPBank,...) for instant reconciliation.',
 
     // Meter Modal
     'meter.title': 'Record Meter & Generate Invoice',
@@ -936,7 +963,30 @@ export const translations: Record<Language, Record<string, string>> = {
     'provider.btn_dispatch': 'Dispatch Technician',
     'provider.assigning': 'Assigning...',
     'provider.btn_save_service': 'Save Service',
-    'provider.staff_distribution': 'Technician & Cleaner Staff Workload Distribution'
+    'provider.staff_distribution': 'Technician & Cleaner Staff Workload Distribution',
+
+    // Phase 2: E-Signature
+    'contract.sign_title': 'E-Sign Rental Lease Agreement',
+    'contract.pending_signature': 'Pending E-Signature',
+    'contract.ready_to_sign': 'Your rental lease agreement is ready for e-signing',
+    'contract.ready_desc': 'Please complete digital signing (drawn signature or secure OTP) to activate resident access and unit turnover.',
+    'contract.sign_now': 'E-Sign Agreement Now',
+    'contract.select_method': 'Select E-Signature Method',
+    'contract.method_draw': 'Draw Signature',
+    'contract.method_otp': 'Verify via Secure OTP',
+    'contract.draw_instruction': 'Use your mouse or finger to draw your signature:',
+    'contract.clear_signature': 'Clear & Redo',
+    'contract.sign_here': 'Sign here',
+    'contract.otp_desc': 'A 6-digit one-time passcode (OTP) will be dispatched via Zalo Notification Service / SMS to your verified phone number.',
+    'contract.send_otp': 'Send OTP Code',
+    'contract.otp_sent_success': 'OTP passcode has been dispatched successfully!',
+    'contract.legal_notice': 'By confirming, you agree to all terms of the rental lease agreement and validate your legally binding electronic signature under Vietnam Electronic Transactions Law.',
+    'contract.signing': 'Authenticating signature...',
+    'contract.confirm_sign': 'Confirm & Sign Agreement',
+    'contract.signed_success': 'Contract E-Signed Successfully!',
+    'contract.certificate_title': 'Electronic Contract Certificate',
+    'contract.certificate_valid': 'Valid & Legally Binding Certificate',
+    'contract.view_certificate': 'SHA-256 Certificate'
   },
 
   ko: {

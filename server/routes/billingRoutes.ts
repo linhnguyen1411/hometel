@@ -249,6 +249,43 @@ paymentRouter.post('/', authenticate, (req: AuthenticatedRequest, res) => {
   }
 });
 
+// GET /api/v1/payments/vietqr/info/:invoiceId
+paymentRouter.get('/vietqr/info/:invoiceId', authenticate, (req: AuthenticatedRequest, res) => {
+  try {
+    const invoice = BillingRepository.findInvoiceById(req.params.invoiceId);
+    if (!invoice) return sendError(res, 'INVOICE_NOT_FOUND', 'Invoice not found', 404);
+
+    if (req.user!.role === 'TENANT' && invoice.tenant_id !== req.user!.userId) {
+      return sendError(res, 'FORBIDDEN', 'Access denied to this invoice', 403);
+    }
+    if (req.user!.role !== 'TENANT' && req.user!.role !== 'SUPER_ADMIN' && !CompanyService.verifyCompanyAccess(req.user!, invoice.company_id)) {
+      return sendError(res, 'FORBIDDEN_COMPANY_ACCESS', 'Access denied to this company invoice', 403);
+    }
+
+    const vietQrInfo = BillingService.getVietQRInfo(req.params.invoiceId);
+    return sendSuccess(res, vietQrInfo);
+  } catch (error: any) {
+    return sendError(res, 'VIETQR_INFO_FAILED', error.message, 500);
+  }
+});
+
+// POST /api/v1/payments/vietqr/webhook & POST /api/v1/payments/webhook
+const handleVietQRWebhook = async (req: any, res: any) => {
+  try {
+    const authHeader = (req.headers['x-api-key'] || req.headers['authorization']) as string | undefined;
+    const result = await BillingService.processVietQRWebhook(req.body, authHeader);
+    return sendSuccess(res, result);
+  } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN_INVALID_WEBHOOK_SECRET', error.message, 403);
+    }
+    return sendError(res, 'WEBHOOK_PROCESSING_FAILED', error.message, 500);
+  }
+};
+
+paymentRouter.post('/vietqr/webhook', handleVietQRWebhook);
+paymentRouter.post('/webhook', handleVietQRWebhook);
+
 // GET /api/v1/payments (List payments)
 paymentRouter.get('/', authenticate, (req: AuthenticatedRequest, res) => {
   const companyId = req.query.companyId as string;

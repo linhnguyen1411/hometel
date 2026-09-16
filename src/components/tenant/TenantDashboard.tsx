@@ -5,8 +5,10 @@ import { useLanguage } from '../../context/LanguageContext.js';
 import { RentalContract, Invoice, ServiceRequest, RentalApplication } from '../../types/index.js';
 import { PaymentModal } from './PaymentModal.js';
 import { QuickServiceModal } from './QuickServiceModal.js';
+import { ContractSigningModal } from './ContractSigningModal.js';
+import { ContractEvidenceModal } from './ContractEvidenceModal.js';
 import { PortalShell, PortalMenuItem } from '../layout/PortalShell.js';
-import { Home, Receipt, Wrench, Shield, CheckCircle2, Plus, FileText, Sparkles } from 'lucide-react';
+import { Home, Receipt, Wrench, Shield, CheckCircle2, Plus, FileText, Sparkles, PenTool, ShieldCheck } from 'lucide-react';
 
 interface TenantDashboardProps {
   onBrowseServices?: () => void;
@@ -19,12 +21,17 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
   const [loading, setLoading] = useState(true);
 
   const [activeContract, setActiveContract] = useState<RentalContract | null>(null);
+  const [contracts, setContracts] = useState<RentalContract[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [applications, setApplications] = useState<RentalApplication[]>([]);
 
   // Payment modal
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+
+  // E-Sign modal
+  const [signingContract, setSigningContract] = useState<RentalContract | null>(null);
+  const [viewingEvidenceContractId, setViewingEvidenceContractId] = useState<string | null>(null);
 
   // New service request quick modal
   const [showReqModal, setShowReqModal] = useState(false);
@@ -38,14 +45,16 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [cRes, iRes, sRes, aRes, svcs] = await Promise.all([
+      const [cRes, iRes, sRes, aRes, svcs, allContracts] = await Promise.all([
         api.getActiveContract().catch(() => null),
         api.getInvoices(),
         api.getServiceRequests(),
         api.getApplications(),
-        api.getServices()
+        api.getServices(),
+        api.getContracts().catch(() => [])
       ]);
       setActiveContract(cRes);
+      setContracts(allContracts || []);
       setInvoices(iRes);
       setServiceRequests(sRes);
       setApplications(aRes);
@@ -86,6 +95,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
 
   const unpaidCount = invoices.filter(i => i.status !== 'PAID').length;
   const pendingRequestsCount = serviceRequests.filter(s => s.status !== 'COMPLETED' && s.status !== 'CANCELLED').length;
+  const pendingContract = contracts.find(c => c.status === 'PENDING' || c.status === 'DRAFT');
 
   const menuItems: PortalMenuItem[] = [
     {
@@ -134,6 +144,34 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
       }}
     >
       <div className="space-y-6 pb-16">
+        {/* Pending Contract E-Signing Alert */}
+        {pendingContract && (
+          <div className="p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 rounded-2xl border border-emerald-300 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider">
+                  {t('contract.pending_signature', 'Chờ ký kết điện tử')}
+                </span>
+                <span className="text-xs font-mono font-bold text-slate-700">{pendingContract.contract_number}</span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                {t('contract.ready_to_sign', 'Hợp đồng thuê căn hộ của bạn đã sẵn sàng ký kết')}
+              </h3>
+              <p className="text-xs text-slate-600">
+                {t('contract.ready_desc', 'Vui lòng hoàn tất ký kết điện tử (chữ ký tay hoặc OTP bảo mật) để kích hoạt quyền lợi cư dân và nhận bàn giao căn hộ.')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSigningContract(pendingContract)}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer"
+            >
+              <PenTool className="w-4 h-4" />
+              <span>{t('contract.sign_now', 'Ký hợp đồng điện tử ngay')}</span>
+            </button>
+          </div>
+        )}
+
         {/* TAB 1: Active Lease */}
         {activeTab === 'lease' && (
           <div className="space-y-6">
@@ -150,9 +188,21 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
                         {t('explorer.room_number')} {activeContract.room_number} • {activeContract.building_name}
                       </h2>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                      {t(`status.${activeContract.status.toLowerCase()}`, activeContract.status)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {activeContract.signed_at && (
+                        <button
+                          type="button"
+                          onClick={() => setViewingEvidenceContractId(activeContract.id)}
+                          className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center gap-1 transition-all"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{t('contract.view_certificate', 'Chứng thư SHA-256')}</span>
+                        </button>
+                      )}
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        {t(`status.${activeContract.status.toLowerCase()}`, activeContract.status)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid sm:grid-cols-3 gap-4 text-xs">
@@ -387,6 +437,24 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
           onClose={() => setShowReqModal(false)}
           roomId={activeContract?.room_id}
           onSuccess={fetchData}
+        />
+
+        {/* E-Signature Modal */}
+        <ContractSigningModal
+          contract={signingContract}
+          isOpen={!!signingContract}
+          onClose={() => setSigningContract(null)}
+          onSignSuccess={() => {
+            setSigningContract(null);
+            fetchData();
+          }}
+        />
+
+        {/* Evidence Certificate Modal */}
+        <ContractEvidenceModal
+          contractId={viewingEvidenceContractId || ''}
+          isOpen={!!viewingEvidenceContractId}
+          onClose={() => setViewingEvidenceContractId(null)}
         />
       </div>
     </PortalShell>

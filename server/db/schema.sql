@@ -202,6 +202,12 @@ CREATE TABLE IF NOT EXISTS rental_contracts (
     payment_day_of_month INTEGER NOT NULL DEFAULT 5,
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('DRAFT', 'PENDING', 'ACTIVE', 'EXPIRING', 'EXPIRED', 'TERMINATED')),
     terms TEXT,
+    signature_data TEXT,
+    signing_method TEXT,
+    signed_at TEXT,
+    signer_ip TEXT,
+    signer_user_agent TEXT,
+    e_signature_evidence TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -388,6 +394,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     entity_type TEXT,
     entity_id TEXT,
+    channel TEXT NOT NULL DEFAULT 'IN_APP',
+    delivery_status TEXT NOT NULL DEFAULT 'DELIVERED',
+    recipient_phone TEXT,
+    metadata TEXT,
     read_at TEXT,
     created_at TEXT NOT NULL
 );

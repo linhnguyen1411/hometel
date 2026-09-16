@@ -197,3 +197,79 @@ contractRouter.post('/', authenticate, requireRole('OWNER', 'STAFF', 'SUPER_ADMI
     return sendError(res, 'CREATE_CONTRACT_FAILED', error.message, 500);
   }
 });
+
+// POST /api/v1/contracts/:id/send-otp (Request OTP for signing contract)
+contractRouter.post('/:id/send-otp', authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { channel } = req.body || {};
+    const result = await RentalService.sendSigningOtp(req.user!, req.params.id, channel);
+    return sendSuccess(res, result);
+  } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN', error.message, 403);
+    }
+    if (error.message === 'CONTRACT_NOT_FOUND') {
+      return sendError(res, 'CONTRACT_NOT_FOUND', 'Contract not found', 404);
+    }
+    if (error.message === 'CONTRACT_ALREADY_SIGNED') {
+      return sendError(res, 'CONTRACT_ALREADY_SIGNED', 'Contract is already signed and active', 409);
+    }
+    return sendError(res, 'SEND_OTP_FAILED', error.message, 500);
+  }
+});
+
+// POST /api/v1/contracts/:id/sign (Tenant E-Signs contract via Canvas or OTP)
+contractRouter.post('/:id/sign', authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { signingMethod, signatureData, otpCode } = req.body;
+    if (!signingMethod || !['CANVAS_DRAW', 'OTP'].includes(signingMethod)) {
+      return sendError(res, 'VALIDATION_ERROR', 'signingMethod must be CANVAS_DRAW or OTP', 400);
+    }
+
+    const signerIp = req.ip || req.socket.remoteAddress || '127.0.0.1';
+    const signerUserAgent = req.headers['user-agent'] || 'Unknown';
+
+    const result = await RentalService.signContract(req.user!, req.params.id, {
+      signingMethod,
+      signatureData,
+      otpCode,
+      signerIp,
+      signerUserAgent
+    });
+
+    return sendSuccess(res, result);
+  } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN', error.message, 403);
+    }
+    if (error.message === 'CONTRACT_NOT_FOUND') {
+      return sendError(res, 'CONTRACT_NOT_FOUND', 'Contract not found', 404);
+    }
+    if (error.message === 'CONTRACT_ALREADY_SIGNED') {
+      return sendError(res, 'CONTRACT_ALREADY_SIGNED', 'Contract is already active and signed', 409);
+    }
+    if (error.message === 'INVALID_OTP' || error.message === 'OTP_EXPIRED_OR_NOT_FOUND') {
+      return sendError(res, error.message, 'Invalid or expired OTP code', 400);
+    }
+    if (error.message === 'INVALID_SIGNATURE_DATA') {
+      return sendError(res, 'INVALID_SIGNATURE_DATA', 'Invalid canvas signature image data', 400);
+    }
+    return sendError(res, 'SIGN_CONTRACT_FAILED', error.message, 500);
+  }
+});
+
+// GET /api/v1/contracts/:id/evidence (Retrieve legal audit evidence of e-signature)
+contractRouter.get('/:id/evidence', authenticate, (req: AuthenticatedRequest, res) => {
+  try {
+    const evidence = RentalService.getContractEvidence(req.user!, req.params.id);
+    return sendSuccess(res, evidence);
+  } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN', error.message, 403);
+    }
+    if (error.message === 'CONTRACT_NOT_FOUND') {
+      return sendError(res, 'CONTRACT_NOT_FOUND', 'Contract not found', 404);
+    }
+    return sendError(res, 'GET_EVIDENCE_FAILED', error.message, 500);
+  }
+});

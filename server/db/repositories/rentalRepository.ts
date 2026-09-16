@@ -31,6 +31,12 @@ export interface RentalContractRow {
   payment_day_of_month: number;
   status: 'DRAFT' | 'PENDING' | 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'TERMINATED';
   terms: string | null;
+  signature_data?: string | null;
+  signing_method?: 'CANVAS_DRAW' | 'OTP' | 'DIGITAL_CERT' | null;
+  signed_at?: string | null;
+  signer_ip?: string | null;
+  signer_user_agent?: string | null;
+  e_signature_evidence?: string | null;
   created_at: string;
   updated_at: string;
 }

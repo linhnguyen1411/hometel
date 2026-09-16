@@ -7,6 +7,7 @@ import { NotificationRepository } from '../db/repositories/notificationRepositor
 import { AuditRepository } from '../db/repositories/auditRepository.js';
 import { TokenPayload } from './authService.js';
 import { CompanyService } from './companyService.js';
+import { ZaloService } from './zaloService.js';
 
 export class BillingService {
   /**
@@ -402,5 +403,197 @@ export class BillingService {
     }
 
     return result;
+  }
+
+  /**
+   * Get VietQR NAPAS 247 Dynamic Payment Info for an Invoice
+   */
+  static getVietQRInfo(invoiceId: string) {
+    const invoice = BillingRepository.findInvoiceById(invoiceId);
+    if (!invoice) throw new Error('INVOICE_NOT_FOUND');
+
+    const bankId = process.env.VIETQR_BANK_ID || 'MB';
+    const bankName = process.env.VIETQR_BANK_NAME || 'Ngân hàng Quân Đội (MBBank)';
+    const accountNo = process.env.VIETQR_ACCOUNT_NO || '0905123456';
+    const accountName = process.env.VIETQR_ACCOUNT_NAME || 'HOMTEL RESIDENTIAL DA NANG';
+
+    const transferContent = `HOMTEL ${invoice.invoice_number}`;
+    const amount = invoice.outstanding_amount;
+
+    // Standard VietQR QuickLink (NAPAS 247 Compliant)
+    const qrImageUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accountName)}`;
+
+    return {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      billingMonth: invoice.billing_month,
+      roomNumber: invoice.room_number,
+      buildingName: invoice.building_name,
+      amount,
+      bankId,
+      bankName,
+      accountNo,
+      accountName,
+      transferContent,
+      qrImageUrl,
+      invoiceStatus: invoice.status,
+      isFullyPaid: invoice.status === 'PAID' || invoice.outstanding_amount <= 0
+    };
+  }
+
+  /**
+   * VietQR Bank Transfer Webhook Auto-Reconciliation (SePay / Casso / VietQR format)
+   * Automatically recognizes incoming bank transfers, creates payment record and clears debt.
+   */
+  static async processVietQRWebhook(
+    payload: any,
+    authHeader?: string
+  ): Promise<{ success: boolean; processedCount: number; transactions: any[] }> {
+    // 1. Verify Webhook Secret if configured
+    const expectedSecret = process.env.VIETQR_WEBHOOK_SECRET || process.env.SEPAY_WEBHOOK_SECRET;
+    if (expectedSecret && authHeader) {
+      const cleanHeader = authHeader.replace(/^(Apikey|Bearer)\s+/i, '').trim();
+      if (cleanHeader !== expectedSecret) {
+        throw new Error('FORBIDDEN_INVALID_WEBHOOK_SECRET');
+      }
+    }
+
+    // 2. Normalize transaction items (supports both SePay single object and Casso data array)
+    const items: any[] = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+      ? payload
+      : payload
+      ? [payload]
+      : [];
+
+    const processedList: any[] = [];
+
+    for (const item of items) {
+      // Ignore outgoing transfer
+      if (item.transferType === 'out' || item.type === 'OUT') {
+        continue;
+      }
+
+      const content = String(item.content || item.description || '');
+      const rawAmount = Number(item.transferAmount || item.amount || 0);
+      const reference = String(item.referenceCode || item.tid || item.id || `TX_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
+
+      if (rawAmount <= 0) continue;
+
+      // Idempotency: skip if transaction already processed
+      const existingPay = BillingRepository.findPaymentByReference(reference);
+      if (existingPay) {
+        processedList.push({
+          reference,
+          status: 'SKIPPED_ALREADY_PROCESSED',
+          paymentId: existingPay.id,
+          invoiceId: existingPay.invoice_id
+        });
+        continue;
+      }
+
+      // 3. Extract Invoice Number or ID from transfer content
+      // Matches INV-<room>-<month>-<suffix> or inv_<hex>
+      const invMatch = content.match(/INV-[A-Za-z0-9-]+/) || content.match(/inv_[a-z0-9_]+/);
+      let matchedInvoice: any = null;
+
+      if (invMatch) {
+        matchedInvoice = BillingRepository.findInvoiceByNumber(invMatch[0]) || BillingRepository.findInvoiceById(invMatch[0]);
+      }
+
+      // Fallback: If no invoice number matched in content, search by outstanding amount
+      if (!matchedInvoice) {
+        const candidateInvoices = BillingRepository.findAllInvoices({ status: 'ISSUED' });
+        matchedInvoice = candidateInvoices.find(inv => inv.outstanding_amount === rawAmount);
+      }
+
+      if (!matchedInvoice) {
+        processedList.push({
+          reference,
+          status: 'UNMATCHED_INVOICE',
+          amount: rawAmount,
+          content
+        });
+        continue;
+      }
+
+      // Check if invoice is already fully paid
+      if (matchedInvoice.outstanding_amount <= 0 || matchedInvoice.status === 'PAID') {
+        processedList.push({
+          reference,
+          status: 'INVOICE_ALREADY_PAID',
+          invoiceId: matchedInvoice.id,
+          invoiceNumber: matchedInvoice.invoice_number,
+          amount: rawAmount
+        });
+        continue;
+      }
+
+      // 4. Process Payment Transaction Atomically
+      const paymentAmount = Math.min(rawAmount, matchedInvoice.outstanding_amount);
+      const result = BillingRepository.createPaymentTransaction(
+        {
+          id: 'pay_vqr_' + crypto.randomUUID().substring(0, 8),
+          invoice_id: matchedInvoice.id,
+          tenant_id: matchedInvoice.tenant_id,
+          company_id: matchedInvoice.company_id,
+          amount: paymentAmount,
+          method: 'BANK_TRANSFER',
+          status: 'SUCCESS',
+          transaction_reference: reference,
+          paid_at: item.transactionDate || item.when || new Date().toISOString(),
+          notes: `VietQR Webhook auto-reconciled: ${reference} (${content})`
+        },
+        matchedInvoice.tenant_id
+      );
+
+      // 5. Send Zalo ZNS and In-App notification
+      try {
+        await ZaloService.sendZns(
+          matchedInvoice.tenant_id,
+          'PAYMENT_RECEIVED',
+          'Xác nhận thanh toán thành công',
+          `Hệ thống Homtel đã nhận thanh toán ${paymentAmount.toLocaleString()} VND qua VietQR cho hóa đơn ${matchedInvoice.invoice_number}. Số dư còn lại: ${result.invoice.outstanding_amount.toLocaleString()} VND.`,
+          'PAYMENT',
+          result.payment.id
+        );
+      } catch (e) {
+        console.warn('Could not dispatch Zalo ZNS for payment:', e);
+      }
+
+      // 6. Record Audit Log
+      AuditRepository.create({
+        id: 'aud_' + crypto.randomUUID().substring(0, 8),
+        actor_id: matchedInvoice.tenant_id,
+        actor_email: 'vietqr-webhook@homtel.vn',
+        action: 'VIETQR_AUTO_RECONCILE',
+        entity_type: 'INVOICE',
+        entity_id: matchedInvoice.id,
+        new_value: JSON.stringify({
+          reference,
+          amount: paymentAmount,
+          invoiceNumber: matchedInvoice.invoice_number,
+          newStatus: result.invoice.status,
+          outstanding: result.invoice.outstanding_amount
+        })
+      });
+
+      processedList.push({
+        reference,
+        status: 'RECONCILED',
+        invoiceId: matchedInvoice.id,
+        invoiceNumber: matchedInvoice.invoice_number,
+        paidAmount: paymentAmount,
+        invoiceStatus: result.invoice.status,
+        outstanding: result.invoice.outstanding_amount
+      });
+    }
+
+    return {
+      success: true,
+      processedCount: processedList.filter(p => p.status === 'RECONCILED').length,
+      transactions: processedList
+    };
   }
 }

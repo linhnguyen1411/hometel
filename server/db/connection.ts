@@ -38,6 +38,27 @@ export class DatabaseClient {
         );
         CREATE INDEX IF NOT EXISTS idx_action_dismissals_key ON action_dismissals(action_key);
       `);
+
+      // Safe column migrations for Phase 2: E-Signature & Multi-channel notifications
+      const safeAddColumn = (table: string, colDef: string) => {
+        try {
+          this.instance!.exec(`ALTER TABLE ${table} ADD COLUMN ${colDef};`);
+        } catch {
+          // Column already exists
+        }
+      };
+
+      safeAddColumn('rental_contracts', 'signature_data TEXT');
+      safeAddColumn('rental_contracts', 'signing_method TEXT');
+      safeAddColumn('rental_contracts', 'signed_at TEXT');
+      safeAddColumn('rental_contracts', 'signer_ip TEXT');
+      safeAddColumn('rental_contracts', 'signer_user_agent TEXT');
+      safeAddColumn('rental_contracts', 'e_signature_evidence TEXT');
+
+      safeAddColumn('notifications', 'channel TEXT DEFAULT "IN_APP"');
+      safeAddColumn('notifications', 'delivery_status TEXT DEFAULT "DELIVERED"');
+      safeAddColumn('notifications', 'recipient_phone TEXT');
+      safeAddColumn('notifications', 'metadata TEXT');
     }
     return this.instance;
   }

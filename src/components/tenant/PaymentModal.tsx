@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Invoice } from '../../types/index.js';
 import { api } from '../../services/api.js';
 import { useLanguage } from '../../context/LanguageContext.js';
-import { CreditCard, Landmark, DollarSign, Check, X, ShieldCheck, QrCode } from 'lucide-react';
+import { CreditCard, QrCode, Check, X, ShieldCheck, Copy, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
 
 interface PaymentModalProps {
   invoice: Invoice | null;
@@ -12,27 +12,73 @@ interface PaymentModalProps {
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ invoice, onClose, onPaymentSuccess }) => {
   const { t } = useLanguage();
-  const [amount, setAmount] = useState<number>(invoice?.outstanding_amount || 0);
-  const [method, setMethod] = useState<'BANK_TRANSFER' | 'CARD' | 'CASH' | 'ONLINE'>('ONLINE');
-  const [reference, setReference] = useState<string>(`TRANS-${Math.floor(100000 + Math.random() * 900000)}`);
-  const [notes, setNotes] = useState<string>('Monthly rental & utility settlement');
+  const [method, setMethod] = useState<'ONLINE' | 'CARD'>('ONLINE');
+  const [vietQrInfo, setVietQrInfo] = useState<any | null>(null);
+  const [loadingQr, setLoadingQr] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const pollingRef = useRef<any>(null);
+
+  // Fetch VietQR info when modal opens
+  useEffect(() => {
+    if (invoice && invoice.id) {
+      setLoadingQr(true);
+      api.getVietQRInfo(invoice.id)
+        .then(res => setVietQrInfo(res))
+        .catch(err => console.warn('Could not fetch VietQR info:', err))
+        .finally(() => setLoadingQr(false));
+    }
+  }, [invoice?.id]);
+
+  // Auto-polling for VietQR webhook payment settlement
+  useEffect(() => {
+    if (!invoice || success) return;
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const updated = await api.getInvoiceById(invoice.id);
+        if (updated && (updated.status === 'PAID' || updated.outstanding_amount <= 0)) {
+          clearInterval(pollingRef.current);
+          setSuccess(true);
+          setTimeout(() => {
+            onPaymentSuccess();
+            onClose();
+          }, 2000);
+        }
+      } catch (err) {
+        // quiet fail on polling
+      }
+    }, 3000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [invoice?.id, success, onPaymentSuccess, onClose]);
+
   if (!invoice) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  // Fallback direct confirmation
+  const handleManualConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
       await api.processPayment({
         invoiceId: invoice.id,
-        amount,
-        method,
-        transactionReference: reference,
-        notes
+        amount: invoice.outstanding_amount,
+        method: method === 'ONLINE' ? 'BANK_TRANSFER' : 'CARD',
+        transactionReference: `MANUAL-${Date.now()}`,
+        notes: `Thanh toán hóa đơn ${invoice.invoice_number}`
       });
       setSuccess(true);
       setTimeout(() => {
@@ -41,7 +87,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ invoice, onClose, on
         onClose();
       }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Payment processing failed');
+      setError(err.message || 'Xử lý thanh toán thất bại');
     } finally {
       setSubmitting(false);
     }
@@ -49,11 +95,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ invoice, onClose, on
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <h3 className="font-bold text-slate-900 text-base">{t('payment.title')}</h3>
-            <p className="text-xs text-slate-500">{t('payment.invoice_number')}: {invoice.invoice_number} • {invoice.billing_month}</p>
+            <h3 className="font-bold text-slate-900 text-base">{t('payment.title', 'Thanh toán hóa đơn')}</h3>
+            <p className="text-xs text-slate-500">
+              {t('payment.invoice_number', 'Hóa đơn')}: {invoice.invoice_number} • {invoice.billing_month}
+            </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
@@ -61,108 +109,184 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ invoice, onClose, on
         </div>
 
         {success ? (
-          <div className="p-6 bg-emerald-50 text-emerald-800 rounded-xl text-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-              <Check className="w-6 h-6" />
+          <div className="p-6 bg-emerald-50 text-emerald-800 rounded-2xl text-center space-y-3 border border-emerald-200">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+              <Check className="w-7 h-7 stroke-[3]" />
             </div>
-            <h4 className="font-bold text-base">{t('payment.success')}</h4>
+            <h4 className="font-bold text-lg text-emerald-950">{t('payment.success', 'Thanh toán thành công!')}</h4>
             <p className="text-xs text-emerald-700">
-              Ref: {reference}
+              Hệ thống VietQR đã tự động gạch nợ thành công cho hóa đơn {invoice.invoice_number}.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div className="space-y-4 text-xs">
             {error && (
-              <div className="p-2 bg-red-50 text-red-700 rounded border border-red-200">
-                {error}
+              <div className="p-3 bg-red-50 text-red-700 rounded-xl border border-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+            {/* Total Due Banner */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
               <div>
-                <span className="text-[11px] text-slate-400 uppercase font-semibold">{t('payment.total_amount')}</span>
-                <span className="text-lg font-black text-slate-900 block">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t('payment.total_amount', 'Số tiền cần thanh toán')}</span>
+                <span className="text-xl font-black text-slate-900 block mt-0.5">
                   {invoice.outstanding_amount.toLocaleString()} VND
                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                 {t(`status.${invoice.status.toLowerCase()}`, invoice.status)}
               </span>
             </div>
 
+            {/* Method Tabs */}
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">{t('payment.total_amount')} (VND)</label>
-              <input
-                type="number"
-                required
-                min={1000}
-                max={invoice.outstanding_amount}
-                value={amount}
-                onChange={e => setAmount(parseFloat(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-sm bg-white"
-              />
-            </div>
-
-            {/* Payment Method */}
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1.5">{t('payment.select_method')}</label>
+              <label className="block font-semibold text-slate-700 mb-1.5">{t('payment.select_method', 'Chọn phương thức')}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setMethod('ONLINE')}
-                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 ${
+                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
                     method === 'ONLINE'
-                      ? 'border-blue-600 bg-blue-50 text-blue-800 font-semibold'
-                      : 'border-slate-200 bg-white text-slate-700'
+                      ? 'border-blue-600 bg-blue-50 text-blue-900 font-bold shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <QrCode className="w-4 h-4 text-blue-600" />
-                  <span className="text-[11px]">{t('payment.method_qr')}</span>
+                  <span className="text-[11px]">{t('payment.method_qr', 'Mã VietQR 24/7')}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setMethod('CARD')}
-                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 ${
+                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
                     method === 'CARD'
-                      ? 'border-blue-600 bg-blue-50 text-blue-800 font-semibold'
-                      : 'border-slate-200 bg-white text-slate-700'
+                      ? 'border-blue-600 bg-blue-50 text-blue-900 font-bold shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <CreditCard className="w-4 h-4 text-purple-600" />
-                  <span className="text-[11px]">{t('payment.method_card')}</span>
+                  <span className="text-[11px]">{t('payment.method_card', 'Thẻ / Tiền mặt')}</span>
                 </button>
               </div>
             </div>
 
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">{t('payment.invoice_number')}</label>
-              <input
-                type="text"
-                readOnly
-                value={reference}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-600 font-mono"
-              />
-            </div>
+            {/* VietQR View */}
+            {method === 'ONLINE' && (
+              <div className="space-y-3">
+                {loadingQr ? (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-500" />
+                    <p className="text-xs">Đang sinh mã VietQR NAPAS 247...</p>
+                  </div>
+                ) : vietQrInfo ? (
+                  <div className="space-y-3">
+                    {/* QR Code Container */}
+                    <div className="p-3 bg-white border border-slate-200 rounded-2xl flex flex-col items-center shadow-xs">
+                      <img
+                        src={vietQrInfo.qrImageUrl}
+                        alt="VietQR NAPAS 247"
+                        className="w-52 h-52 object-contain rounded-xl"
+                      />
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                        <span>{t('payment.waiting_for_payment', 'Đang đợi chuyển khoản (tự động nhận diện sau 3s)...')}</span>
+                      </div>
+                    </div>
 
-            <div className="pt-2 flex justify-end gap-2">
+                    {/* Bank Transfer Details with Copy Buttons */}
+                    <div className="space-y-1.5 p-3 bg-slate-50 rounded-xl border border-slate-200 font-mono text-[11px]">
+                      {/* Bank Name */}
+                      <div className="flex justify-between items-center py-0.5">
+                        <span className="text-slate-500 font-sans">Ngân hàng:</span>
+                        <span className="font-sans font-bold text-slate-900">{vietQrInfo.bankName}</span>
+                      </div>
+
+                      {/* Account No */}
+                      <div className="flex justify-between items-center py-0.5">
+                        <span className="text-slate-500 font-sans">Số tài khoản:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900">{vietQrInfo.accountNo}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(vietQrInfo.accountNo, 'acc')}
+                            className="p-1 hover:bg-slate-200 rounded text-slate-600"
+                            title="Sao chép"
+                          >
+                            {copiedField === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Account Name */}
+                      <div className="flex justify-between items-center py-0.5">
+                        <span className="text-slate-500 font-sans">Chủ tài khoản:</span>
+                        <span className="font-sans font-semibold text-slate-800">{vietQrInfo.accountName}</span>
+                      </div>
+
+                      {/* Amount */}
+                      <div className="flex justify-between items-center py-0.5">
+                        <span className="text-slate-500 font-sans">Số tiền:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-blue-700">{vietQrInfo.amount.toLocaleString()} VND</span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(String(vietQrInfo.amount), 'amt')}
+                            className="p-1 hover:bg-slate-200 rounded text-slate-600"
+                            title="Sao chép"
+                          >
+                            {copiedField === 'amt' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Transfer Content */}
+                      <div className="flex justify-between items-center py-0.5 bg-amber-50/80 px-2 py-1 rounded border border-amber-200">
+                        <span className="text-amber-900 font-sans font-semibold">Nội dung CK:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-amber-950">{vietQrInfo.transferContent}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(vietQrInfo.transferContent, 'content')}
+                            className="p-1 hover:bg-amber-200 rounded text-amber-800"
+                            title="Sao chép"
+                          >
+                            {copiedField === 'content' ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                <p className="text-[11px] text-slate-400 text-center leading-normal">
+                  {t('payment.auto_detect', 'Quét mã VietQR bằng app ngân hàng (Vietcombank, MB, Techcombank, VPBank,...) để hệ thống tự động gạch nợ tức thì.')}
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={onClose}
                 className="px-4 py-2 border border-slate-300 rounded-xl font-semibold text-slate-700 hover:bg-slate-50"
               >
-                {t('btn.cancel')}
+                {t('btn.cancel', 'Hủy / Đóng')}
               </button>
+
               <button
-                type="submit"
+                type="button"
+                onClick={handleManualConfirm}
                 disabled={submitting}
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-xs flex items-center gap-1.5"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>{submitting ? t('payment.processing') : t('payment.confirm')}</span>
+                <span>{submitting ? t('payment.processing', 'Đang xử lý...') : t('payment.confirm', 'Xác nhận đã chuyển')}</span>
               </button>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </div>

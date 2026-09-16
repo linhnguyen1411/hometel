@@ -125,6 +125,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data)
     }),
+  sendContractOtp: (contractId: string, channel: 'ZALO' | 'SMS' = 'ZALO') =>
+    request<any>(`/contracts/${contractId}/send-otp`, {
+      method: 'POST',
+      body: JSON.stringify({ channel })
+    }),
+  signContract: (contractId: string, data: { signingMethod: 'CANVAS_DRAW' | 'OTP'; signatureData?: string; otpCode?: string }) =>
+    request<any>(`/contracts/${contractId}/sign`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  getContractEvidence: (contractId: string) => request<any>(`/contracts/${contractId}/evidence`),
 
   // Meters & Readings
   getRoomMeters: (roomId: string) => request<any[]>(`/meters/room/${roomId}`),
@@ -150,6 +161,13 @@ export const api = {
       body: JSON.stringify(data)
     }),
   getPayments: (params: string = '') => request<any[]>(`/payments?${params}`),
+  getVietQRInfo: (invoiceId: string) => request<any>(`/payments/vietqr/info/${invoiceId}`),
+  sendVietQRWebhook: (data: any, secret?: string) =>
+    request<any>('/payments/vietqr/webhook', {
+      method: 'POST',
+      headers: secret ? { 'x-api-key': secret } : undefined,
+      body: JSON.stringify(data)
+    }),
 
   // Services
   getServices: (params: string = '') => request<any[]>(`/services?${params}`),

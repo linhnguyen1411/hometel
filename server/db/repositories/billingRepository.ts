@@ -157,6 +157,25 @@ export class BillingRepository {
     return invoice;
   }
 
+  static findInvoiceByNumber(invoiceNumber: string): (InvoiceRow & { tenant_name: string; tenant_email: string; room_number: string; building_name: string; company_name: string; items: InvoiceItemRow[] }) | null {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+      SELECT i.*, u.full_name as tenant_name, u.email as tenant_email, r.room_number, b.name as building_name, comp.name as company_name
+      FROM invoices i
+      JOIN users u ON i.tenant_id = u.id
+      JOIN rooms r ON i.room_id = r.id
+      JOIN buildings b ON r.building_id = b.id
+      JOIN companies comp ON i.company_id = comp.id
+      WHERE i.invoice_number = ?
+    `);
+    const invoice = stmt.get(invoiceNumber) as any;
+    if (!invoice) return null;
+
+    const itemsStmt = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?');
+    invoice.items = itemsStmt.all(invoice.id) as InvoiceItemRow[];
+    return invoice;
+  }
+
   static findAllInvoices(options?: {
     tenantId?: string;
     companyId?: string;
@@ -346,6 +365,12 @@ export class BillingRepository {
     const db = getDatabase();
     const stmt = db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at DESC');
     return stmt.all(invoiceId) as PaymentRow[];
+  }
+
+  static findPaymentByReference(reference: string): PaymentRow | null {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM payments WHERE transaction_reference = ?');
+    return (stmt.get(reference) as PaymentRow) || null;
   }
 
   static findAllPayments(options?: { tenantId?: string; companyId?: string; status?: string; limit?: number; offset?: number }) {
