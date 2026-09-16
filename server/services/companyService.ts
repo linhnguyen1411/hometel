@@ -20,6 +20,13 @@ export class CompanyService {
     return hasMembership;
   }
 
+  static getUserCompanyId(auth: TokenPayload): string {
+    if (auth.memberships && auth.memberships.length > 0) {
+      return auth.memberships[0].companyId;
+    }
+    return 'cmp_own_1';
+  }
+
   /**
    * Company Admin creates staff member for their company.
    * Atomic operation creating User (role: STAFF) and CompanyMembership (role: STAFF).

@@ -27,7 +27,8 @@ import {
   EyeOff,
   Copy,
   Check,
-  Info
+  Info,
+  Camera
 } from 'lucide-react';
 
 interface RoomDetailPanelProps {
@@ -35,6 +36,7 @@ interface RoomDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenMeterModal?: (room: any) => void;
+  onOpenOcrModal?: (room: any) => void;
   onRefresh?: () => void;
 }
 
@@ -43,6 +45,7 @@ export const RoomDetailPanel: React.FC<RoomDetailPanelProps> = ({
   isOpen,
   onClose,
   onOpenMeterModal,
+  onOpenOcrModal,
   onRefresh
 }) => {
   const { t } = useLanguage();
@@ -334,16 +337,28 @@ export const RoomDetailPanel: React.FC<RoomDetailPanelProps> = ({
                 <div className="space-y-4 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-700">Công tơ thông minh đã gắn</span>
-                    {onOpenMeterModal && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenMeterModal(data.room)}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-xs"
-                      >
-                        <Zap className="w-3.5 h-3.5" />
-                        <span>Ghi chỉ số & Lập hóa đơn</span>
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {onOpenOcrModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenOcrModal(data.room)}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>AI OCR Quét ảnh</span>
+                        </button>
+                      )}
+                      {onOpenMeterModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenMeterModal(data.room)}
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Ghi số thủ công</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {data.meters && data.meters.length > 0 ? (

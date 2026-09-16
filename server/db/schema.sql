@@ -422,3 +422,63 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+
+-- CRM LEADS
+CREATE TABLE IF NOT EXISTS crm_leads (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    source TEXT NOT NULL DEFAULT 'WEBSITE' CHECK(source IN ('WEBSITE', 'FACEBOOK', 'REFERRAL', 'WALK_IN', 'ZALO', 'HOTLINE', 'OTHER')),
+    status TEXT NOT NULL DEFAULT 'NEW' CHECK(status IN ('NEW', 'CONTACTED', 'TOUR_SCHEDULED', 'TOUR_COMPLETED', 'CONVERTED', 'LOST')),
+    budget_min REAL,
+    budget_max REAL,
+    preferred_room_type TEXT,
+    move_in_date TEXT,
+    notes TEXT,
+    assigned_staff_id TEXT REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_crm_leads_company ON crm_leads(company_id);
+CREATE INDEX IF NOT EXISTS idx_crm_leads_status ON crm_leads(status);
+
+-- ROOM TOURS
+CREATE TABLE IF NOT EXISTS room_tours (
+    id TEXT PRIMARY KEY,
+    lead_id TEXT NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+    room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    scheduled_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'SCHEDULED' CHECK(status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW')),
+    host_staff_id TEXT REFERENCES users(id),
+    feedback TEXT,
+    rating INTEGER CHECK(rating IS NULL OR (rating >= 1 AND rating <= 5)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_tours_lead ON room_tours(lead_id);
+CREATE INDEX IF NOT EXISTS idx_room_tours_room ON room_tours(room_id);
+CREATE INDEX IF NOT EXISTS idx_room_tours_status ON room_tours(status);
+
+-- BUILDING EXPENSES (Operating Expenses for P&L)
+CREATE TABLE IF NOT EXISTS building_expenses (
+    id TEXT PRIMARY KEY,
+    building_id TEXT NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+    category TEXT NOT NULL CHECK(category IN ('UTILITY_MUNICIPAL', 'MAINTENANCE_REPAIR', 'CLEANING_JANITORIAL', 'SECURITY', 'INTERNET_TELECOM', 'TAX_INSURANCE', 'STAFF_SALARY', 'OTHER')),
+    description TEXT NOT NULL,
+    amount REAL NOT NULL,
+    expense_date TEXT NOT NULL,
+    period_month TEXT NOT NULL,
+    vendor_name TEXT,
+    receipt_url TEXT,
+    created_by TEXT REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_building_expenses_bld ON building_expenses(building_id);
+CREATE INDEX IF NOT EXISTS idx_building_expenses_month ON building_expenses(period_month);
+

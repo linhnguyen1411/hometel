@@ -9,6 +9,9 @@ import { TodayCockpit } from './TodayCockpit.js';
 import { Building360View } from './Building360View.js';
 import { ActionCenterView } from './ActionCenterView.js';
 import { RoomDetailPanel } from './RoomDetailPanel.js';
+import { CrmDashboardView } from './CrmDashboardView.js';
+import { ConsolidatedPnlView } from './ConsolidatedPnlView.js';
+import { OcrMeterModal } from './OcrMeterModal.js';
 import { CommandPalette } from '../common/CommandPalette.js';
 import {
   Building2,
@@ -28,17 +31,20 @@ import {
   AlertCircle,
   Layers,
   Sparkles,
-  Search
+  Search,
+  PieChart,
+  Camera
 } from 'lucide-react';
 
 export const OwnerDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'today' | 'actions' | 'building360' | 'rooms' | 'applications' | 'contracts' | 'invoices' | 'configs' | 'staff'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'actions' | 'building360' | 'crm' | 'finance' | 'rooms' | 'applications' | 'contracts' | 'invoices' | 'configs' | 'staff'>('today');
   const [loading, setLoading] = useState(true);
 
-  // Building OS Dialogs
+  // Building OS Dialogs & OCR
   const [activeRoom360Id, setActiveRoom360Id] = useState<string | null>(null);
+  const [ocrRoom, setOcrRoom] = useState<Room | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Data
@@ -201,6 +207,16 @@ export const OwnerDashboard: React.FC = () => {
       id: 'building360',
       label: 'Bản đồ phòng & Tòa nhà (Building 360)',
       icon: <Building2 className="w-4 h-4 text-emerald-400" />
+    },
+    {
+      id: 'crm',
+      label: 'CRM Khách & Lịch hẹn (Leads)',
+      icon: <Users className="w-4 h-4 text-purple-400" />
+    },
+    {
+      id: 'finance',
+      label: 'Tài chính & P&L (Consolidated P&L)',
+      icon: <PieChart className="w-4 h-4 text-emerald-400" />
     },
     {
       id: 'rooms',
@@ -366,6 +382,16 @@ export const OwnerDashboard: React.FC = () => {
           />
         )}
 
+        {/* TAB 0.3: CRM LEADS & ROOM TOURS */}
+        {activeTab === 'crm' && (
+          <CrmDashboardView onNavigateTab={(tab) => setActiveTab(tab as any)} />
+        )}
+
+        {/* TAB 0.4: CONSOLIDATED P&L MULTI-BUILDING */}
+        {activeTab === 'finance' && (
+          <ConsolidatedPnlView buildings={buildings} />
+        )}
+
         {/* TAB 1: Rooms & Meter Billing Trigger */}
       {activeTab === 'rooms' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -425,6 +451,14 @@ export const OwnerDashboard: React.FC = () => {
                         className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
                       >
                         Room 360
+                      </button>
+                      <button
+                        onClick={() => setOcrRoom(r)}
+                        className="px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 font-semibold rounded-lg border border-purple-200 inline-flex items-center gap-1"
+                        title="AI Vision OCR Quét chỉ số"
+                      >
+                        <Camera className="w-3 h-3 text-purple-600" />
+                        <span>AI OCR</span>
                       </button>
                       <button
                         onClick={() => setSelectedRoomForBilling(r)}
@@ -951,7 +985,19 @@ export const OwnerDashboard: React.FC = () => {
           setActiveRoom360Id(null);
           setSelectedRoomForBilling(r);
         }}
+        onOpenOcrModal={(r) => {
+          setActiveRoom360Id(null);
+          setOcrRoom(r);
+        }}
         onRefresh={fetchData}
+      />
+
+      {/* AI OCR Meter Reading Modal */}
+      <OcrMeterModal
+        isOpen={!!ocrRoom}
+        onClose={() => setOcrRoom(null)}
+        room={ocrRoom}
+        onSuccess={fetchData}
       />
 
       {/* Global Command Palette (Ctrl+K) */}

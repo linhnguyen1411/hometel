@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { BillingService } from '../services/billingService.js';
+import { OcrService } from '../services/ocrService.js';
 import { BillingRepository } from '../db/repositories/billingRepository.js';
 import { BuildingRepository } from '../db/repositories/buildingRepository.js';
 import { RentalRepository } from '../db/repositories/rentalRepository.js';
@@ -73,6 +74,62 @@ meterRouter.post('/readings', authenticate, requireRole('OWNER', 'STAFF', 'SUPER
       return sendError(res, 'INVALID_READING_VALUE', error.message, 400);
     }
     return sendError(res, 'RECORD_READING_FAILED', error.message, 500);
+  }
+});
+
+// POST /api/v1/meters/ocr-scan (Scan meter photo and extract readings + anomaly check)
+meterRouter.post('/ocr-scan', authenticate, requireRole('OWNER', 'STAFF', 'SUPER_ADMIN'), (req: AuthenticatedRequest, res) => {
+  try {
+    const { meterId, imageBase64OrUrl, meterType, previousReading, manualReadingOverride } = req.body;
+    if (!imageBase64OrUrl || !meterType || previousReading === undefined) {
+      return sendError(res, 'VALIDATION_ERROR', 'imageBase64OrUrl, meterType, and previousReading are required', 400);
+    }
+
+    const result = OcrService.scanMeterImage({
+      meterId,
+      imageBase64OrUrl,
+      meterType,
+      previousReading: parseFloat(previousReading),
+      manualReadingOverride: manualReadingOverride !== undefined ? parseFloat(manualReadingOverride) : undefined
+    });
+
+    return sendSuccess(res, result);
+  } catch (error: any) {
+    return sendError(res, 'OCR_SCAN_FAILED', error.message, 400);
+  }
+});
+
+// POST /api/v1/meters/:meterId/commit-ocr (Atomic save reading + optional auto draft invoice)
+meterRouter.post('/:meterId/commit-ocr', authenticate, requireRole('OWNER', 'STAFF', 'SUPER_ADMIN'), (req: AuthenticatedRequest, res) => {
+  try {
+    const { meterId } = req.params;
+    const { readingValue, readingDate, imageUrl, ocrConfidence, ocrRawText, autoDraftInvoice, billingMonth, notes } = req.body;
+
+    if (readingValue === undefined || !readingDate) {
+      return sendError(res, 'VALIDATION_ERROR', 'readingValue and readingDate are required', 400);
+    }
+
+    const result = OcrService.commitOcrReading(req.user!, {
+      meterId,
+      readingValue: parseFloat(readingValue),
+      readingDate,
+      imageUrl,
+      ocrConfidence: ocrConfidence ? parseFloat(ocrConfidence) : undefined,
+      ocrRawText,
+      autoDraftInvoice: autoDraftInvoice === true,
+      billingMonth,
+      notes
+    });
+
+    return sendSuccess(res, result, 201);
+  } catch (error: any) {
+    if (error.message.includes('FORBIDDEN')) {
+      return sendError(res, 'FORBIDDEN_COMPANY_ACCESS', error.message, 403);
+    }
+    if (error.message.includes('NOT_FOUND')) {
+      return sendError(res, error.message, error.message, 404);
+    }
+    return sendError(res, 'COMMIT_OCR_FAILED', error.message, 400);
   }
 });
 

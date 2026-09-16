@@ -102,6 +102,7 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(data)
     }),
+  getMetersByRoom: (roomId: string) => request<any[]>(`/meters/room/${roomId}`),
 
   // Rentals & Applications
   applyForRoom: (data: any) =>
@@ -228,5 +229,56 @@ export const api = {
     request<any>('/operations/ai-triage', {
       method: 'POST',
       body: JSON.stringify({ description, categoryHint })
+    }),
+
+  // Phase 4: OCR Meter Reading
+  scanMeterOcr: (data: { meterId?: string; imageBase64OrUrl: string; meterType: 'ELECTRICITY' | 'WATER'; previousReading: number; manualReadingOverride?: number }) =>
+    request<any>('/meters/ocr-scan', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  commitMeterOcr: (meterId: string, data: any) =>
+    request<any>(`/meters/${meterId}/commit-ocr`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  // Phase 4: CRM Leads & Room Tours
+  getCrmLeads: (params: string = '') => request<{ leads: any[]; funnel: any }>(`/crm/leads?${params}`),
+  createCrmLead: (data: any) =>
+    request<any>('/crm/leads', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  updateCrmLead: (id: string, data: any) =>
+    request<any>(`/crm/leads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+  getCrmTours: (params: string = '') => request<any[]>(`/crm/tours?${params}`),
+  scheduleCrmTour: (data: any) =>
+    request<any>('/crm/tours', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  completeCrmTour: (id: string, data: any) =>
+    request<any>(`/crm/tours/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+  convertCrmLead: (id: string, data: any) =>
+    request<any>(`/crm/leads/${id}/convert`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  // Phase 4: Multi-Building Consolidated Financial P&L
+  getConsolidatedPnL: (periodMonth?: string) =>
+    request<any>(`/finance/pnl/consolidated${periodMonth ? '?periodMonth=' + periodMonth : ''}`),
+  getExpenses: (params: string = '') => request<any[]>(`/finance/expenses?${params}`),
+  createExpense: (data: any) =>
+    request<any>('/finance/expenses', {
+      method: 'POST',
+      body: JSON.stringify(data)
     })
 };
