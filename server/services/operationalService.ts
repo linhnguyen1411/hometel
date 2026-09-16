@@ -514,12 +514,33 @@ export class OperationalService {
   }
 
   /**
+   * Helpers: Privacy Masking for PII
+   */
+  private static maskPhone(phone?: string | null): string | null {
+    if (!phone) return null;
+    const clean = phone.trim();
+    if (clean.length < 6) return '***';
+    return clean.slice(0, 4) + ' ••• ' + clean.slice(-3);
+  }
+
+  private static maskEmail(email?: string | null): string | null {
+    if (!email) return null;
+    const parts = email.split('@');
+    if (parts.length !== 2) return '***@***.***';
+    const name = parts[0];
+    const domain = parts[1];
+    const maskedName = name.length <= 2 ? name[0] + '***' : name[0] + '***' + name[name.length - 1];
+    return `${maskedName}@${domain}`;
+  }
+
+  /**
    * 3. BUILDING 360 OPERATIONAL VIEW
    */
-  static getBuilding360(buildingId: string) {
+  static getBuilding360(buildingId: string, auth?: TokenPayload) {
     const building = OperationsRepository.getBuildingDetail(buildingId);
     if (!building) throw new Error('BUILDING_NOT_FOUND');
 
+    const isPrivileged = !!(auth && (auth.role === 'OWNER' || auth.role === 'SUPER_ADMIN'));
     const floors = OperationsRepository.getFloorsByBuilding(buildingId);
     const todayStr = new Date().toISOString().split('T')[0];
     const rooms = OperationsRepository.getRoomsWithHealthData(buildingId, todayStr);
@@ -551,6 +572,9 @@ export class OperationalService {
 
       return {
         ...r,
+        tenant_phone: isPrivileged ? r.tenant_phone : this.maskPhone(r.tenant_phone),
+        tenant_email: isPrivileged ? r.tenant_email : this.maskEmail(r.tenant_email),
+        isTenantDataMasked: !isPrivileged,
         healthStatus,
         healthReason
       };
@@ -602,9 +626,11 @@ export class OperationalService {
   /**
    * 4. ROOM 360 OPERATIONAL VIEW
    */
-  static getRoom360(roomId: string) {
+  static getRoom360(roomId: string, auth?: TokenPayload) {
     const room = OperationsRepository.getRoomDetailWithContext(roomId);
     if (!room) throw new Error('ROOM_NOT_FOUND');
+
+    const isPrivileged = !!(auth && (auth.role === 'OWNER' || auth.role === 'SUPER_ADMIN'));
 
     // Parse JSON
     try {
@@ -684,8 +710,9 @@ export class OperationalService {
       tenant: activeContract ? {
         id: activeContract.tenant_id,
         name: activeContract.tenant_name,
-        email: activeContract.tenant_email,
-        phone: activeContract.tenant_phone,
+        email: isPrivileged ? activeContract.tenant_email : this.maskEmail(activeContract.tenant_email),
+        phone: isPrivileged ? activeContract.tenant_phone : this.maskPhone(activeContract.tenant_phone),
+        isMasked: !isPrivileged,
         avatarUrl: activeContract.tenant_avatar,
         contractId: activeContract.id,
         contractNumber: activeContract.contract_number,
@@ -693,13 +720,18 @@ export class OperationalService {
         endDate: activeContract.end_date,
         rentAmount: activeContract.rent_amount
       } : null,
-      activeContract,
+      activeContract: activeContract ? {
+        ...activeContract,
+        tenant_email: isPrivileged ? activeContract.tenant_email : this.maskEmail(activeContract.tenant_email),
+        tenant_phone: isPrivileged ? activeContract.tenant_phone : this.maskPhone(activeContract.tenant_phone)
+      } : null,
       deposit,
       meters,
       equipment,
       invoices,
       serviceRequests,
-      timeline
+      timeline,
+      isPrivileged
     };
   }
 

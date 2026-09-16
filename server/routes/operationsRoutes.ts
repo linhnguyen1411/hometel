@@ -80,7 +80,7 @@ operationsRouter.post('/actions/:actionKey/quick-action', authenticate, requireR
  */
 operationsRouter.get('/buildings/:id/360', optionalAuth, (req: AuthenticatedRequest, res) => {
   try {
-    const data = OperationalService.getBuilding360(req.params.id);
+    const data = OperationalService.getBuilding360(req.params.id, req.user);
     return sendSuccess(res, data);
   } catch (err: any) {
     console.error('Error fetching building 360:', err);
@@ -94,7 +94,7 @@ operationsRouter.get('/buildings/:id/360', optionalAuth, (req: AuthenticatedRequ
  */
 operationsRouter.get('/rooms/:id/360', optionalAuth, (req: AuthenticatedRequest, res) => {
   try {
-    const data = OperationalService.getRoom360(req.params.id);
+    const data = OperationalService.getRoom360(req.params.id, req.user);
     return sendSuccess(res, data);
   } catch (err: any) {
     console.error('Error fetching room 360:', err);

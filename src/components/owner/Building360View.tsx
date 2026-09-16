@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api.js';
 import { useLanguage } from '../../context/LanguageContext.js';
 import { Building360Data, Building } from '../../types/index.js';
+import { BuildingFacadeView } from './BuildingFacadeView.js';
+import { BuildingGridView } from './BuildingGridView.js';
 import {
   Building2,
   Home,
@@ -17,7 +19,8 @@ import {
   ArrowRight,
   Shield,
   Zap,
-  ChevronDown
+  ChevronDown,
+  LayoutGrid
 } from 'lucide-react';
 
 interface Building360ViewProps {
@@ -39,6 +42,7 @@ export const Building360View: React.FC<Building360ViewProps> = ({
   );
   const [data, setData] = useState<Building360Data | null>(null);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'facade' | 'grid'>('facade');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -161,41 +165,49 @@ export const Building360View: React.FC<Building360ViewProps> = ({
         </div>
       )}
 
-      {/* Visual Room Map (Floor Grid) */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      {/* View Switcher & Filter Controls Bar */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Layers className="w-5 h-5 text-blue-600" />
-              <span>Bản đồ trạng thái phòng trực quan (Visual Room Map)</span>
+              <span>Sơ đồ tổng quan tòa nhà (Building Digital Twin)</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Nhấp vào bất kỳ phòng nào để mở Room 360 xem chi tiết cư dân, hóa đơn và thiết bị.
+              Chuyển đổi linh hoạt giữa mặt đứng kiến trúc trực quan và sơ đồ lưới mặt bằng phân tầng.
             </p>
           </div>
 
-          {/* Color legend */}
-          <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="text-slate-600">Ổn định</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-slate-600">Quá hạn / Sự cố</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-amber-400" />
-              <span className="text-slate-600">Bảo trì / Sắp hết hạn</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-blue-500" />
-              <span className="text-slate-600">Đang trống</span>
-            </div>
+          {/* View Mode Toggle Switcher */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200 self-start md:self-auto">
+            <button
+              type="button"
+              onClick={() => setViewMode('facade')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewMode === 'facade'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Mặt đứng (Facade)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Sơ đồ lưới (Grid)</span>
+            </button>
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filter Pills & Search */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {[
@@ -210,7 +222,7 @@ export const Building360View: React.FC<Building360ViewProps> = ({
                 onClick={() => setFilterStatus(f.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                   filterStatus === f.id
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/20'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                 }`}
               >
@@ -230,107 +242,37 @@ export const Building360View: React.FC<Building360ViewProps> = ({
             />
           </div>
         </div>
-
-        {/* Floor-by-Floor Grid */}
-        {loading && (
-          <div className="py-16 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            <span>Đang tải bản đồ phòng tòa nhà...</span>
-          </div>
-        )}
-
-        {!loading && data && (
-          <div className="space-y-8">
-            {data.floors.map((floor) => {
-              const filteredRooms = floor.rooms.filter((r) => {
-                const matchStatus =
-                  filterStatus === 'ALL' || r.healthStatus === filterStatus;
-                const matchSearch =
-                  !searchQuery ||
-                  r.room_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (r.tenant_name && r.tenant_name.toLowerCase().includes(searchQuery.toLowerCase()));
-                return matchStatus && matchSearch;
-              });
-
-              if (filteredRooms.length === 0 && (filterStatus !== 'ALL' || searchQuery)) {
-                return null;
-              }
-
-              return (
-                <div key={floor.id} className="space-y-3">
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-xs">
-                      TẦNG {floor.floor_number}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500">
-                      {floor.name} • {filteredRooms.length} phòng hiển thị
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    {filteredRooms.map((room) => {
-                      // Color theme based on healthStatus
-                      const colorClasses =
-                        room.healthStatus === 'CRITICAL'
-                          ? 'border-red-300 bg-red-50/50 hover:bg-red-50 text-red-900 shadow-xs shadow-red-500/10'
-                          : room.healthStatus === 'ATTENTION'
-                          ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-50 text-amber-900'
-                          : room.healthStatus === 'AVAILABLE'
-                          ? 'border-blue-200 bg-blue-50/30 hover:bg-blue-50 text-blue-900'
-                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-900';
-
-                      const dotColor =
-                        room.healthStatus === 'CRITICAL'
-                          ? 'bg-red-500'
-                          : room.healthStatus === 'ATTENTION'
-                          ? 'bg-amber-400'
-                          : room.healthStatus === 'AVAILABLE'
-                          ? 'bg-blue-500'
-                          : 'bg-emerald-500';
-
-                      return (
-                        <div
-                          key={room.id}
-                          onClick={() => onSelectRoom(room.id)}
-                          className={`p-3 rounded-2xl border cursor-pointer transition-all duration-150 relative group ${colorClasses}`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
-                              <span className="font-bold text-sm">{room.room_number}</span>
-                            </div>
-                            <span className="text-[10px] font-semibold text-slate-400">
-                              {room.area}m²
-                            </span>
-                          </div>
-
-                          <div className="mt-2 text-[11px] leading-tight space-y-0.5">
-                            {room.tenant_name ? (
-                              <span className="font-bold text-slate-800 block truncate">
-                                {room.tenant_name}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 italic block">Phòng trống</span>
-                            )}
-                            <span className="text-slate-500 block">
-                              {room.base_rent.toLocaleString()} đ
-                            </span>
-                          </div>
-
-                          {/* Health Reason Note */}
-                          <div className="mt-2 pt-2 border-t border-slate-100/60 text-[10px] text-slate-500 line-clamp-1">
-                            {room.healthReason}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="py-20 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2 bg-white rounded-3xl border border-slate-200">
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span>Đang tải thông tin tòa nhà...</span>
+        </div>
+      )}
+
+      {/* Main Visual Display (Facade vs Grid) */}
+      {!loading && data && (
+        <div>
+          {viewMode === 'facade' ? (
+            <BuildingFacadeView
+              data={data}
+              onSelectRoom={onSelectRoom}
+              filterStatus={filterStatus}
+              searchQuery={searchQuery}
+            />
+          ) : (
+            <BuildingGridView
+              data={data}
+              onSelectRoom={onSelectRoom}
+              filterStatus={filterStatus}
+              searchQuery={searchQuery}
+              onOpenMeterModal={onOpenMeterModal}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -398,6 +398,7 @@ export interface Building360Data {
 
 export interface Room360Data {
   room: Room & { floor_name?: string; floor_number?: number; building_name?: string; building_address?: string };
+  isPrivileged?: boolean;
   tenant: {
     id: string;
     name: string;
@@ -409,6 +410,7 @@ export interface Room360Data {
     startDate: string;
     endDate: string;
     rentAmount: number;
+    isMasked?: boolean;
   } | null;
   activeContract: RentalContract | null;
   deposit: Deposit | null;

@@ -8,7 +8,7 @@ import { MeterAndInvoiceModal } from './MeterAndInvoiceModal.js';
 import { TodayCockpit } from './TodayCockpit.js';
 import { Building360View } from './Building360View.js';
 import { ActionCenterView } from './ActionCenterView.js';
-import { Room360Modal } from './Room360Modal.js';
+import { RoomDetailPanel } from './RoomDetailPanel.js';
 import { CommandPalette } from '../common/CommandPalette.js';
 import {
   Building2,
@@ -942,9 +942,10 @@ export const OwnerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Room 360 Full Profile Modal */}
-      <Room360Modal
+      {/* Room 360 Full Profile Slide-over Drawer */}
+      <RoomDetailPanel
         roomId={activeRoom360Id}
+        isOpen={!!activeRoom360Id}
         onClose={() => setActiveRoom360Id(null)}
         onOpenMeterModal={(r) => {
           setActiveRoom360Id(null);
