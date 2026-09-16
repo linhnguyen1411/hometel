@@ -280,5 +280,33 @@ export const api = {
     request<any>('/finance/expenses', {
       method: 'POST',
       body: JSON.stringify(data)
+    }),
+
+  // Phase 5: Provider Reviews & Ratings
+  submitProviderReview: (data: any) =>
+    request<any>('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  getPendingReviews: () => request<any[]>('/reviews/pending'),
+  getProviderReputation: (providerId: string) => request<any>(`/reviews/provider/${providerId}`),
+  getReviewByRequestId: (requestId: string) => request<any>(`/reviews/request/${requestId}`),
+
+  // Phase 5: Resident PWA & Web Push
+  subscribePushNotification: (data: any) =>
+    request<any>('/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  unsubscribePushNotification: (data: any) =>
+    request<any>('/push/unsubscribe', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  getPushStatus: () => request<{ subscribed: boolean; count: number }>('/push/status'),
+  testPushNotification: (data: any) =>
+    request<any>('/push/test', {
+      method: 'POST',
+      body: JSON.stringify(data)
     })
 };

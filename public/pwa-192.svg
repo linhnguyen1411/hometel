@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="homtelGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="48" fill="url(#homtelGrad192)" />
+  <g fill="#ffffff">
+    <path d="M52 52h22v88H52z" />
+    <path d="M118 52h22v88h-22z" />
+    <path d="M52 88h88v18H52z" />
+    <path d="M96 38l44 30H52l44-30z" />
+  </g>
+  <circle cx="96" cy="124" r="6" fill="#38bdf8" />
+</svg>

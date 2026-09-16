@@ -15,6 +15,8 @@ import { docsRouter } from './routes/docsRoutes.js';
 import { operationsRouter } from './routes/operationsRoutes.js';
 import { crmRouter } from './routes/crmRoutes.js';
 import { financialRouter } from './routes/financialRoutes.js';
+import { reviewRouter } from './routes/reviewRoutes.js';
+import { pushRouter } from './routes/pushRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -51,6 +53,8 @@ export function createApp() {
   app.use('/api/v1/operations', operationsRouter);
   app.use('/api/v1/crm', crmRouter);
   app.use('/api/v1/finance', financialRouter);
+  app.use('/api/v1/reviews', reviewRouter);
+  app.use('/api/v1/push', pushRouter);
   app.use('/api/v1/docs', docsRouter);
   app.use('/api/docs', (req, res) => res.redirect('/api/v1/docs'));
 

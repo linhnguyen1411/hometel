@@ -5,17 +5,18 @@ import { useLanguage } from '../../context/LanguageContext.js';
 import { PortalShell, PortalMenuItem } from '../layout/PortalShell.js';
 import { Service, ServiceRequest } from '../../types/index.js';
 import { SmartWorkOrderModal } from './SmartWorkOrderModal.js';
-import { Wrench, Sparkles, Users, CheckCircle2, Clock, Plus, AlertTriangle, ArrowRight, Eye, ClipboardList } from 'lucide-react';
+import { Wrench, Sparkles, Users, CheckCircle2, Clock, Plus, AlertTriangle, ArrowRight, Eye, ClipboardList, Star } from 'lucide-react';
 
 export const ProviderDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'requests' | 'services' | 'workload'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'services' | 'workload' | 'reviews'>('requests');
   const [loading, setLoading] = useState(true);
 
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [staffWorkload, setStaffWorkload] = useState<any[]>([]);
+  const [reputation, setReputation] = useState<any | null>(null);
 
   // Smart Work Order modal
   const [smartOrderRequest, setSmartOrderRequest] = useState<ServiceRequest | null>(null);
@@ -40,14 +41,17 @@ export const ProviderDashboard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [reqRes, svcRes, loadRes] = await Promise.all([
+      const companyId = user?.memberships?.[0]?.companyId;
+      const [reqRes, svcRes, loadRes, repRes] = await Promise.all([
         api.getServiceRequests(),
         api.getServices(),
-        api.getStaffWorkload()
+        api.getStaffWorkload(),
+        companyId ? api.getProviderReputation(companyId).catch(() => null) : Promise.resolve(null)
       ]);
       setRequests(reqRes);
       setServices(svcRes);
       setStaffWorkload(loadRes);
+      setReputation(repRes);
       if (loadRes.length > 0) {
         setSelectedStaffId(loadRes[0].id);
       }
@@ -127,6 +131,13 @@ export const ProviderDashboard: React.FC = () => {
       label: t('menu.provider_workload', 'Staff Workload'),
       icon: <Users className="w-4 h-4" />,
       badge: staffWorkload.length
+    },
+    {
+      id: 'reviews',
+      label: t('reviews.providerReputation', 'Đánh giá & Uy tín'),
+      icon: <Star className="w-4 h-4" />,
+      badge: reputation?.totalReviews || undefined,
+      badgeColor: 'bg-emerald-500 text-white'
     }
   ];
 
@@ -362,6 +373,176 @@ export const ProviderDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Phase 5: Reputation & Resident Reviews Tab */}
+      {activeTab === 'reviews' && (
+        <div className="space-y-6">
+          {/* Reputation Bento Grid */}
+          <div className="grid md:grid-cols-4 gap-4">
+            {/* Main Score */}
+            <div className="md:col-span-2 bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-2xl border border-slate-700 shadow-md flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  {t('reviews.providerReputation', 'Uy tín & Điểm đánh giá')}
+                </span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-4xl font-black text-white">
+                    {(reputation?.averageRating || 5.0).toFixed(1)}
+                  </span>
+                  <span className="text-sm text-slate-400 font-semibold">/ 5.0</span>
+                </div>
+                <div className="flex items-center gap-1 mt-2">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-4 h-4 ${
+                        s <= Math.round(reputation?.averageRating || 5)
+                          ? 'text-amber-400 fill-amber-400'
+                          : 'text-slate-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-right space-y-1">
+                <div className="text-2xl font-bold text-emerald-400">
+                  {reputation?.positivePercentage || 100}%
+                </div>
+                <span className="text-xs text-slate-400 block">
+                  {t('reviews.positiveRate', 'Tỷ lệ hài lòng')}
+                </span>
+                <span className="text-xs text-slate-500 block">
+                  {reputation?.totalReviews || 0} {t('admin.records', 'bản ghi')}
+                </span>
+              </div>
+            </div>
+
+            {/* Punctuality Card */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {t('reviews.punctuality', 'Đúng giờ')}
+              </span>
+              <div className="text-3xl font-black text-slate-900 mt-2">
+                {(reputation?.averagePunctuality || 5.0).toFixed(1)}
+                <span className="text-xs text-slate-400 font-normal ml-1">/ 5.0</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Tác phong & thời gian phản hồi theo cam kết SLA.</p>
+            </div>
+
+            {/* Work Quality Card */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {t('reviews.workQuality', 'Chất lượng xử lý')}
+              </span>
+              <div className="text-3xl font-black text-slate-900 mt-2">
+                {(reputation?.averageQuality || 5.0).toFixed(1)}
+                <span className="text-xs text-slate-400 font-normal ml-1">/ 5.0</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Đánh giá kỹ thuật & độ bền bỉ sau khi hoàn thành.</p>
+            </div>
+          </div>
+
+          {/* Star Breakdown & Reviews List */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Star Breakdown */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <h4 className="font-bold text-slate-900 text-sm">Phân bố số sao</h4>
+              <div className="space-y-2">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = reputation?.ratingDistribution?.[star] || 0;
+                  const total = reputation?.totalReviews || 1;
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <div key={star} className="flex items-center gap-2 text-xs">
+                      <span className="w-8 font-semibold text-slate-600 flex items-center gap-0.5">
+                        {star} <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      </span>
+                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-amber-400 rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right font-mono text-slate-500">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Reviews List */}
+            <div className="md:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-blue-600" />
+                  {t('reviews.verifiedReviews', 'Đánh giá xác thực từ cư dân')}
+                </h4>
+                <span className="text-xs text-slate-500 font-medium">
+                  {reputation?.recentReviews?.length || 0} nhận xét gần nhất
+                </span>
+              </div>
+
+              {(!reputation?.recentReviews || reputation.recentReviews.length === 0) ? (
+                <div className="py-12 text-center text-slate-400 text-xs">
+                  {t('reviews.noReviewsYet', 'Chưa có đánh giá nào được ghi nhận.')}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reputation.recentReviews.map((rev: any) => {
+                    let parsedTags: string[] = [];
+                    try {
+                      parsedTags = rev.tags ? JSON.parse(rev.tags) : [];
+                    } catch {}
+
+                    return (
+                      <div key={rev.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-xs">{rev.tenant_name || 'Cư dân'}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                              {rev.service_category || 'Dịch vụ'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                className={`w-3 h-3 ${
+                                  s <= rev.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300'
+                                }`}
+                              />
+                            ))}
+                            <span className="text-xs font-bold text-amber-600 ml-1">{rev.rating}.0</span>
+                          </div>
+                        </div>
+
+                        {rev.comment && (
+                          <p className="text-xs text-slate-700 italic">"{rev.comment}"</p>
+                        )}
+
+                        {parsedTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {parsedTags.map((tag: string) => (
+                              <span key={tag} className="text-[10px] bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="text-[10px] text-slate-400 pt-1">
+                          {new Date(rev.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

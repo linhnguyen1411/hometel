@@ -482,3 +482,35 @@ CREATE TABLE IF NOT EXISTS building_expenses (
 CREATE INDEX IF NOT EXISTS idx_building_expenses_bld ON building_expenses(building_id);
 CREATE INDEX IF NOT EXISTS idx_building_expenses_month ON building_expenses(period_month);
 
+-- SERVICE PROVIDER REVIEWS & RATINGS
+CREATE TABLE IF NOT EXISTS provider_reviews (
+    id TEXT PRIMARY KEY,
+    service_request_id TEXT NOT NULL UNIQUE REFERENCES service_requests(id) ON DELETE CASCADE,
+    provider_company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+    punctuality_rating INTEGER CHECK(punctuality_rating IS NULL OR (punctuality_rating >= 1 AND punctuality_rating <= 5)),
+    quality_rating INTEGER CHECK(quality_rating IS NULL OR (quality_rating >= 1 AND quality_rating <= 5)),
+    comment TEXT,
+    tags TEXT, -- JSON array string e.g. ["nhanh_chong", "nhiet_tinh", "chuyen_nghiep"]
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_reviews_req ON provider_reviews(service_request_id);
+CREATE INDEX IF NOT EXISTS idx_provider_reviews_provider ON provider_reviews(provider_company_id);
+CREATE INDEX IF NOT EXISTS idx_provider_reviews_tenant ON provider_reviews(tenant_id);
+
+-- PUSH NOTIFICATION SUBSCRIPTIONS (Resident PWA)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT,
+    auth TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
+

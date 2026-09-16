@@ -7,8 +7,10 @@ import { PaymentModal } from './PaymentModal.js';
 import { QuickServiceModal } from './QuickServiceModal.js';
 import { ContractSigningModal } from './ContractSigningModal.js';
 import { ContractEvidenceModal } from './ContractEvidenceModal.js';
+import { WorkOrderReviewModal } from './WorkOrderReviewModal.js';
+import { PwaInstallPrompt } from '../pwa/PwaInstallPrompt.js';
 import { PortalShell, PortalMenuItem } from '../layout/PortalShell.js';
-import { Home, Receipt, Wrench, Shield, CheckCircle2, Plus, FileText, Sparkles, PenTool, ShieldCheck } from 'lucide-react';
+import { Home, Receipt, Wrench, Shield, CheckCircle2, Plus, FileText, Sparkles, PenTool, ShieldCheck, Star, Bell, BellOff, WifiOff } from 'lucide-react';
 
 interface TenantDashboardProps {
   onBrowseServices?: () => void;
@@ -42,26 +44,57 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
   const [reqUrgency, setReqUrgency] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'EMERGENCY'>('MEDIUM');
   const [submittingReq, setSubmittingReq] = useState(false);
 
+  // Phase 5: Provider Reviews & Ratings
+  const [reviewingRequest, setReviewingRequest] = useState<any | null>(null);
+  const [pendingReviews, setPendingReviews] = useState<any[]>([]);
+
+  // Phase 5: Push Notifications & Offline Mode
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [cRes, iRes, sRes, aRes, svcs, allContracts] = await Promise.all([
+      const [cRes, iRes, sRes, aRes, svcs, allContracts, pReviews, pStatus] = await Promise.all([
         api.getActiveContract().catch(() => null),
-        api.getInvoices(),
-        api.getServiceRequests(),
-        api.getApplications(),
-        api.getServices(),
-        api.getContracts().catch(() => [])
+        api.getInvoices().catch(() => []),
+        api.getServiceRequests().catch(() => []),
+        api.getApplications().catch(() => []),
+        api.getServices().catch(() => []),
+        api.getContracts().catch(() => []),
+        api.getPendingReviews().catch(() => []),
+        api.getPushStatus().catch(() => ({ subscribed: false, count: 0 }))
       ]);
+
       setActiveContract(cRes);
       setContracts(allContracts || []);
       setInvoices(iRes);
       setServiceRequests(sRes);
       setApplications(aRes);
       setServicesList(svcs);
+      setPendingReviews(pReviews || []);
+      setPushSubscribed(Boolean(pStatus?.subscribed));
       if (svcs.length > 0) setReqServiceId(svcs[0].id);
+
+      // Offline Cache storage
+      if (cRes) {
+        localStorage.setItem('homtel_cached_contract', JSON.stringify(cRes));
+      }
+      if (iRes && iRes.length > 0) {
+        localStorage.setItem('homtel_cached_invoices', JSON.stringify(iRes));
+      }
     } catch (err) {
-      console.error(err);
+      console.warn('Network fetch failed, attempting offline cache recovery:', err);
+      // Fallback from localStorage cache if offline
+      const cachedC = localStorage.getItem('homtel_cached_contract');
+      const cachedI = localStorage.getItem('homtel_cached_invoices');
+      if (cachedC) {
+        try { setActiveContract(JSON.parse(cachedC)); } catch {}
+      }
+      if (cachedI) {
+        try { setInvoices(JSON.parse(cachedI)); } catch {}
+      }
     } finally {
       setLoading(false);
     }
@@ -69,7 +102,51 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
 
   useEffect(() => {
     fetchData();
+
+    const handleOnline = () => { setIsOffline(false); fetchData(); };
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
+
+  const handleTogglePush = async () => {
+    setPushLoading(true);
+    try {
+      if (pushSubscribed) {
+        await api.unsubscribePushNotification({ endpoint: 'browser_push_default' });
+        setPushSubscribed(false);
+      } else {
+        // Request Notification permission if supported
+        if ('Notification' in window && Notification.permission !== 'granted') {
+          const perm = await Notification.requestPermission();
+          if (perm !== 'granted') {
+            alert('Vui lòng cấp quyền thông báo trên trình duyệt của bạn.');
+            setPushLoading(false);
+            return;
+          }
+        }
+        await api.subscribePushNotification({
+          endpoint: `browser_push_${Date.now()}`,
+          userAgent: navigator.userAgent
+        });
+        setPushSubscribed(true);
+        // Dispatch test notification
+        await api.testPushNotification({
+          title: 'Homtel Resident',
+          body: 'Thông báo đẩy đã được kích hoạt thành công trên thiết bị của bạn!'
+        });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi thiết lập thông báo đẩy');
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +221,84 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
       }}
     >
       <div className="space-y-6 pb-16">
+        {/* PWA Mobile & Web Push Strip */}
+        <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${isOffline ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 shadow-sm shadow-emerald-400/50'}`} />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold tracking-wide uppercase text-slate-300">
+                  {isOffline ? (t('pwa.offlineModeNotice') || 'Chế độ ngoại tuyến') : 'Homtel Resident PWA'}
+                </span>
+                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-mono font-semibold">
+                  v1.0-PWA
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {isOffline 
+                  ? 'Dữ liệu căn hộ & hóa đơn đang được đồng bộ từ bộ nhớ đệm cục bộ.' 
+                  : 'Hệ thống kết nối trực tiếp đến ban quản lý tòa nhà và tổng đài dịch vụ.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleTogglePush}
+              disabled={pushLoading}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                pushSubscribed
+                  ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/50'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+              }`}
+            >
+              {pushSubscribed ? (
+                <>
+                  <Bell className="w-3.5 h-3.5 text-blue-400" />
+                  <span>{t('pwa.pushSubscribed') || 'Đã bật thông báo'}</span>
+                </>
+              ) : (
+                <>
+                  <BellOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{t('pwa.pushEnable') || 'Bật thông báo đẩy'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Phase 5: Pending Work Order Reviews Banner */}
+        {pendingReviews.length > 0 && (
+          <div className="p-5 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/15 rounded-2xl border border-amber-300/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-600 text-white uppercase tracking-wider flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-white" />
+                  {t('reviews.pendingAlert') || 'Dịch vụ cần đánh giá'}
+                </span>
+                <span className="text-xs font-semibold text-amber-800">
+                  {pendingReviews.length} {t('reviews.pendingCount', 'yêu cầu hoàn tất')}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                {pendingReviews[0]?.service_name || 'Dịch vụ tiện ích'} — {pendingReviews[0]?.provider_company_name || 'Đối tác kỹ thuật'}
+              </h3>
+              <p className="text-xs text-slate-600">
+                {t('reviews.pendingAlertDesc') || 'Bạn có dịch vụ đã hoàn tất. Hãy chia sẻ đánh giá để giúp nâng cao chất lượng dịch vụ!'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReviewingRequest(pendingReviews[0])}
+              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer hover:scale-105 active:scale-95"
+            >
+              <Star className="w-4 h-4 fill-white text-white" />
+              <span>{t('reviews.reviewNow') || 'Đánh giá ngay'}</span>
+            </button>
+          </div>
+        )}
+
         {/* Pending Contract E-Signing Alert */}
         {pendingContract && (
           <div className="p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 rounded-2xl border border-emerald-300 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-200">
@@ -376,11 +531,22 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <div>
+                    <div className="flex items-center gap-2">
                       {req.staff_name ? (
                         <span className="text-teal-700 font-semibold">{req.staff_name}</span>
                       ) : (
                         <span>{t('status.pending')}</span>
+                      )}
+
+                      {req.status === 'COMPLETED' && (
+                        <button
+                          type="button"
+                          onClick={() => setReviewingRequest(req)}
+                          className="px-2.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded-md font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                        >
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span>{t('reviews.reviewNow') || 'Đánh giá'}</span>
+                        </button>
                       )}
                     </div>
                     <div>{new Date(req.created_at).toLocaleDateString()}</div>
@@ -456,6 +622,17 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
           isOpen={!!viewingEvidenceContractId}
           onClose={() => setViewingEvidenceContractId(null)}
         />
+
+        {/* Phase 5: Work Order Review Modal */}
+        <WorkOrderReviewModal
+          isOpen={!!reviewingRequest}
+          serviceRequest={reviewingRequest}
+          onClose={() => setReviewingRequest(null)}
+          onSuccess={fetchData}
+        />
+
+        {/* Phase 5: PWA Install Prompt Banner */}
+        <PwaInstallPrompt />
       </div>
     </PortalShell>
   );
