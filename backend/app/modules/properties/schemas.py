@@ -8,6 +8,8 @@ class FloorDto(BaseModel):
     floorNumber: int
     name: str
     description: Optional[str] = None
+    floor_number: Optional[int] = None
+    building_id: Optional[str] = None
 
 
 class BuildingDto(BaseModel):
@@ -46,6 +48,14 @@ class RoomDto(BaseModel):
     buildingName: Optional[str] = None
     buildingAddress: Optional[str] = None
     floorNumber: Optional[int] = None
+    room_number: Optional[str] = None
+    room_type: Optional[str] = None
+    base_rent: Optional[float] = None
+    building_name: Optional[str] = None
+    building_address: Optional[str] = None
+    floor_number: Optional[int] = None
+    floor_id: Optional[str] = None
+    building_id: Optional[str] = None
 
 
 class CreateBuildingRequest(BaseModel):

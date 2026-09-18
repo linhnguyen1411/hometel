@@ -1,23 +1,28 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../context/AuthContext.js';
-import { useLanguage } from '../context/LanguageContext.js';
-import { api } from '../services/api.js';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { api } from '../services/api';
 import { 
   Building, Bell, LogOut, LogIn, FileCode, Layers, ShieldCheck, 
   User as UserIcon, ChevronDown, Home, Wrench, Receipt, FileText, Settings
 } from 'lucide-react';
-import { NotificationsModal } from './NotificationsModal.js';
-import { LanguageSelector } from './LanguageSelector.js';
+import { NotificationsModal } from './NotificationsModal';
+import { LanguageSelector } from './LanguageSelector';
 
 interface HeaderProps {
-  currentTab: string;
-  onSelectTab: (tab: string) => void;
+  currentTab?: string;
+  onSelectTab?: (tab: string) => void;
   onOpenAuthModal: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenAuthModal }) => {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const pathname = usePathname() || '/';
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isNotifsOpen, setIsNotifsOpen] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
@@ -59,17 +64,17 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
     }
   };
 
-  const getPortalTitle = (role: string) => {
+  const getPortalInfo = (role: string) => {
     if (role === 'TENANT') {
-      return 'Cổng Cư Dân Của Tôi';
+      return { href: '/my', title: 'Cổng Cư Dân Của Tôi', subtitle: 'Hợp đồng, hóa đơn & yêu cầu của bạn' };
     }
     if (role === 'PROVIDER') {
-      return 'Cổng Điều Phối Dịch Vụ';
+      return { href: '/provider', title: 'Cổng Điều Phối Dịch Vụ', subtitle: 'Tiếp nhận sự cố & điều phối thợ' };
     }
     if (role === 'SUPER_ADMIN') {
-      return 'Trung Tâm Quản Trị Hệ Thống';
+      return { href: '/admin', title: 'Trung Tâm Quản Trị Hệ Thống', subtitle: 'Quản lý tài khoản & phân quyền tối cao' };
     }
-    return 'Cổng Quản Trị Vận Hành (BOS)';
+    return { href: '/owner', title: 'Cổng Quản Trị Vận Hành (BOS)', subtitle: 'Cockpit điều hành, P&L & tòa nhà 360' };
   };
 
   return (
@@ -78,8 +83,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-8">
-            <button
-              onClick={() => onSelectTab('explore')}
+            <Link
+              href="/"
               className="flex items-center gap-2.5 text-left group cursor-pointer focus:outline-hidden"
               aria-label="Về trang chủ Homtel"
             >
@@ -95,31 +100,31 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
                 </span>
                 <span className="block text-[11px] text-slate-500 font-medium">Hệ Thống Căn Hộ Cho Thuê & Vận Hành</span>
               </div>
-            </button>
+            </Link>
 
-            {/* Main Public Navigation Menu (Không còn Cổng Quản Trị trực tiếp ở đây) */}
+            {/* Main Public Navigation Menu */}
             <nav className="hidden md:flex items-center gap-1" aria-label="Điều hướng chính">
-              <button
-                onClick={() => onSelectTab('explore')}
+              <Link
+                href="/explore"
                 className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  currentTab === 'explore'
+                  pathname.startsWith('/explore') || currentTab === 'explore'
                     ? 'text-blue-600 bg-blue-50/90 font-semibold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 Khám phá Căn hộ
-              </button>
+              </Link>
 
-              <button
-                onClick={() => onSelectTab('services')}
+              <Link
+                href="/services"
                 className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  currentTab === 'services'
+                  pathname.startsWith('/services') || currentTab === 'services'
                     ? 'text-blue-600 bg-blue-50/90 font-semibold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 Dịch vụ Cư dân
-              </button>
+              </Link>
 
               <a
                 href="#footer"
@@ -194,10 +199,11 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
 
                       {/* Portal & Management Navigation Links */}
                       <div className="py-1">
-                        {/* Nút Cổng Quản Trị / Portal được đưa vào đây */}
-                        <button
+                        {/* Cổng Quản Trị / Portal link */}
+                        <Link
+                          href={getPortalInfo(user.role).href}
                           onClick={() => {
-                            onSelectTab('dashboard');
+                            if (onSelectTab) onSelectTab('dashboard');
                             setIsUserMenuOpen(false);
                           }}
                           className="w-full px-4 py-2.5 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50 flex items-center gap-2.5 transition-colors cursor-pointer"
@@ -206,60 +212,46 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
                             <Layers className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="text-slate-900 font-bold">{getPortalTitle(user.role)}</div>
-                            <div className="text-[10px] text-slate-500 font-normal">Truy cập giao diện vận hành & dữ liệu</div>
+                            <div className="text-slate-900 font-bold">{getPortalInfo(user.role).title}</div>
+                            <div className="text-[10px] text-slate-500 font-normal">{getPortalInfo(user.role).subtitle}</div>
                           </div>
-                        </button>
+                        </Link>
 
-                        <button
+                        <Link
+                          href="/explore"
                           onClick={() => {
-                            onSelectTab('explore');
+                            if (onSelectTab) onSelectTab('explore');
                             setIsUserMenuOpen(false);
                           }}
                           className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer"
                         >
                           <Home className="w-4 h-4 text-slate-400" />
                           <span>Khám phá căn hộ</span>
-                        </button>
+                        </Link>
 
-                        <button
+                        <Link
+                          href="/services"
                           onClick={() => {
-                            onSelectTab('services');
+                            if (onSelectTab) onSelectTab('services');
                             setIsUserMenuOpen(false);
                           }}
                           className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer"
                         >
                           <Wrench className="w-4 h-4 text-slate-400" />
-                          <span>Dịch vụ & Bảo trì</span>
-                        </button>
-
-                        {(user.role === 'SUPER_ADMIN' || user.role === 'OWNER') && (
-                          <a
-                            href="/api/v1/docs"
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={() => setIsUserMenuOpen(false)}
-                            className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                          >
-                            <FileCode className="w-4 h-4 text-emerald-600" />
-                            <span>Tài liệu API (Swagger UI)</span>
-                          </a>
-                        )}
+                          <span>Dịch vụ cư dân</span>
+                        </Link>
                       </div>
 
-                      {/* Divider */}
-                      <div className="border-t border-slate-100 my-1"></div>
-
-                      {/* Logout */}
-                      <div className="px-2 py-1">
+                      {/* Logout Action */}
+                      <div className="pt-1 border-t border-slate-100">
                         <button
                           onClick={() => {
                             logout();
                             setIsUserMenuOpen(false);
                           }}
-                          className="w-full px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+                          className="w-full px-4 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
                         >
-                          <LogOut className="w-4 h-4 text-red-500" />
+                          <LogOut className="w-4 h-4" />
                           <span>Đăng xuất tài khoản</span>
                         </button>
                       </div>
@@ -270,10 +262,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
             ) : (
               <button
                 onClick={onOpenAuthModal}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-semibold text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Đăng nhập / Đăng ký</span>
+                <span>Đăng nhập</span>
               </button>
             )}
           </div>
@@ -281,12 +273,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onSelectTab, onOpenA
       </header>
 
       {/* Notifications Modal */}
-      {isNotifsOpen && (
-        <NotificationsModal
-          isOpen={isNotifsOpen}
-          onClose={() => setIsNotifsOpen(false)}
-        />
-      )}
+      <NotificationsModal
+        isOpen={isNotifsOpen}
+        onClose={() => setIsNotifsOpen(false)}
+      />
     </>
   );
 };

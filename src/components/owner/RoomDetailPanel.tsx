@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { Room360Data } from '../../types/index.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { Room360Data } from '../../types/index';
 import {
   X,
   Home,
@@ -190,7 +190,7 @@ export const RoomDetailPanel: React.FC<RoomDetailPanelProps> = ({
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
                       <span className="text-slate-400 font-semibold block">Giá thuê cơ bản</span>
                       <span className="text-base font-black text-blue-600 block mt-0.5">
-                        {data.room.base_rent.toLocaleString()} đ
+                        {(data.room.baseRent ?? data.room.base_rent)?.toLocaleString() ?? '—'} đ
                       </span>
                     </div>
 
@@ -317,18 +317,25 @@ export const RoomDetailPanel: React.FC<RoomDetailPanelProps> = ({
                   </div>
 
                   {/* Amenities */}
-                  {data.room.amenities && data.room.amenities.length > 0 && (
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-700 block">Tiện nghi có sẵn:</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {data.room.amenities.map((am: string, i: number) => (
-                          <span key={i} className="px-2.5 py-1 bg-white rounded-lg border border-slate-200 text-slate-700 font-medium text-[11px]">
-                            {am}
-                          </span>
-                        ))}
+                  {(() => {
+                    const amenitiesList = Array.isArray(data.room.amenities)
+                      ? data.room.amenities
+                      : typeof data.room.amenities === 'string'
+                      ? JSON.parse(data.room.amenities || '[]')
+                      : [];
+                    return amenitiesList.length > 0 ? (
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                        <span className="font-bold text-slate-700 block">Tiện nghi có sẵn:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {amenitiesList.map((am: string, i: number) => (
+                            <span key={i} className="px-2.5 py-1 bg-white rounded-lg border border-slate-200 text-slate-700 font-medium text-[11px]">
+                              {am}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null;
+                  })()}
                 </div>
               )}
 
@@ -405,11 +412,11 @@ export const RoomDetailPanel: React.FC<RoomDetailPanelProps> = ({
               {activeTab === 'invoices' && (
                 <div className="space-y-3 text-xs">
                   {data.invoices && data.invoices.length > 0 ? (
-                    data.invoices.map((inv) => (
+                    data.invoices.map((inv: any) => (
                       <div key={inv.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-slate-900">{inv.invoice_number}</span>
+                            <span className="font-mono font-bold text-slate-900">{inv.invoice_number || inv.invoiceNumber || `#${inv.id?.slice(0, 8)}`}</span>
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' :
                               inv.status === 'OVERDUE' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
@@ -418,17 +425,17 @@ export const RoomDetailPanel: React.FC<RoomDetailPanelProps> = ({
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-400 mt-1">
-                            Kỳ: {inv.billing_month} • Hạn: {inv.due_date}
+                            Kỳ: {inv.billing_month || inv.periodMonth || '—'} • Hạn: {inv.due_date || inv.dueDate || '—'}
                           </p>
                         </div>
 
                         <div className="text-right">
                           <span className="font-bold text-sm text-slate-900 block font-mono">
-                            {inv.total.toLocaleString()} đ
+                            {(inv.totalAmount ?? inv.total ?? 0).toLocaleString()} đ
                           </span>
-                          {inv.outstanding_amount > 0 && (
+                          {(inv.outstanding_amount ?? inv.outstandingAmount ?? 0) > 0 && (
                             <span className="text-[11px] text-red-600 font-bold block">
-                              Còn nợ: {inv.outstanding_amount.toLocaleString()} đ
+                              Còn nợ: {(inv.outstanding_amount ?? inv.outstandingAmount ?? 0).toLocaleString()} đ
                             </span>
                           )}
                         </div>

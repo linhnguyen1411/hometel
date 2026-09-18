@@ -1,20 +1,25 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 import jwt
-from passlib.context import CryptContext
+import bcrypt
 from pydantic import BaseModel
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security_scheme = HTTPBearer(auto_error=False)
 
 
 class MembershipPayload(BaseModel):
     companyId: str
     role: str
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
 
 
 class TokenPayload(BaseModel):
@@ -24,13 +29,26 @@ class TokenPayload(BaseModel):
     memberships: List[MembershipPayload] = []
     exp: Optional[int] = None
 
+    @property
+    def user_id(self) -> str:
+        return self.userId
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    # bcrypt password maximum is 72 bytes
+    pwd_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
+
+
+hash_password = get_password_hash
 
 
 def create_access_token(
@@ -40,10 +58,11 @@ def create_access_token(
     memberships: List[Dict[str, str]],
     expires_delta: Optional[timedelta] = None,
 ) -> str:
+    now = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode = {
         "userId": user_id,
@@ -97,9 +116,16 @@ async def get_optional_user(
         return None
 
 
-def require_role(*allowed_roles: str):
+def require_role(*allowed_roles):
+    flat_roles = set()
+    for r in allowed_roles:
+        if isinstance(r, (list, tuple, set)):
+            flat_roles.update(r)
+        else:
+            flat_roles.add(r)
+
     def role_checker(current_user: TokenPayload = Depends(get_current_user)):
-        if current_user.role not in allowed_roles:
+        if current_user.role not in flat_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{current_user.role}' is not authorized for this resource",

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Service } from '../../types/index.js';
-import { api } from '../../services/api.js';
-import { useAuth } from '../../context/AuthContext.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { Service } from '../../types/index';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Wrench, Sparkles, Droplets, Zap, Wind, Check, Send } from 'lucide-react';
 
 interface ServiceCatalogViewProps {
@@ -142,7 +142,7 @@ export const ServiceCatalogView: React.FC<ServiceCatalogViewProps> = ({ onOpenAu
                 </div>
 
                 <h3 className="font-bold text-slate-900 text-base">{svc.name}</h3>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">By {svc.company_name}</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">By {svc.company_name || svc.companyName || 'Homtel Partner'}</p>
 
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
                   {svc.description || t('services.desc')}
@@ -152,10 +152,10 @@ export const ServiceCatalogView: React.FC<ServiceCatalogViewProps> = ({ onOpenAu
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-medium">
-                    {svc.price_type === 'FIXED' ? t('services.price_fixed') : t('services.price_hourly')}
+                    {(svc.priceType ?? svc.price_type) === 'FIXED' ? t('services.price_fixed') : t('services.price_hourly')}
                   </span>
                   <span className="text-base font-extrabold text-slate-900">
-                    {svc.base_price.toLocaleString()} <span className="text-xs font-normal text-slate-500">VND</span>
+                    {(svc.basePrice ?? svc.base_price)?.toLocaleString() ?? '—'} <span className="text-xs font-normal text-slate-500">VND</span>
                   </span>
                 </div>
 
@@ -186,7 +186,7 @@ export const ServiceCatalogView: React.FC<ServiceCatalogViewProps> = ({ onOpenAu
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">{t('services.request_modal_title')}</h3>
-                <p className="text-xs text-slate-500">{requestingService.name} • {requestingService.company_name}</p>
+                <p className="text-xs text-slate-500">{requestingService.name} • {requestingService.company_name || requestingService.companyName || 'Homtel Partner'}</p>
               </div>
               <button
                 onClick={() => setRequestingService(null)}

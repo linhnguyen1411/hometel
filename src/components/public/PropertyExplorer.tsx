@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Room, Building } from '../../types/index.js';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { RoomDetailModal } from './RoomDetailModal.js';
+import { Room, Building } from '../../types/index';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { RoomDetailModal } from './RoomDetailModal';
 import { 
   Search, Building2, MapPin, Maximize2, Users, ArrowRight, Sparkles, 
   CheckCircle2, ShieldCheck, Zap, HelpCircle, PhoneCall, ChevronDown
@@ -49,11 +49,13 @@ export const PropertyExplorer: React.FC<PropertyExplorerProps> = ({ onOpenAuthMo
   }, [searchTerm, selectedBuilding, selectedRoomType, statusFilter, selectedMaxPrice]);
 
   const formatRoomType = (type: string) => {
+    if (!type) return '';
     const key = `room_type.${type.toLowerCase()}`;
     return t(key, type.replace('_', ' '));
   };
 
   const formatStatus = (status: string) => {
+    if (!status) return '';
     const key = `status.${status.toLowerCase()}`;
     return t(key, status);
   };
@@ -264,17 +266,17 @@ export const PropertyExplorer: React.FC<PropertyExplorerProps> = ({ onOpenAuthMo
                   <div className="relative h-52 overflow-hidden bg-slate-100">
                     <img
                       src={mainImg}
-                      alt={`Căn hộ phòng ${room.room_number} ${room.building_name} - ${formatRoomType(room.room_type)} Đà Nẵng`}
+                      alt={`Căn hộ phòng ${room.roomNumber} ${room.buildingName} - ${formatRoomType(room.roomType)} Đà Nẵng`}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
                       decoding="async"
                     />
                     <div className="absolute top-3 left-3 flex gap-1.5">
                       <span className="px-2.5 py-1 bg-slate-900/80 backdrop-blur-xs text-white text-xs font-bold rounded-lg">
-                        Phòng {room.room_number}
+                        Phòng {room.roomNumber}
                       </span>
                       <span className="px-2.5 py-1 bg-blue-600 text-white text-[11px] font-semibold rounded-lg">
-                        {formatRoomType(room.room_type)}
+                        {formatRoomType(room.roomType)}
                       </span>
                     </div>
 
@@ -292,11 +294,11 @@ export const PropertyExplorer: React.FC<PropertyExplorerProps> = ({ onOpenAuthMo
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div>
                       <h3 itemProp="name" className="font-bold text-slate-900 text-base leading-snug">
-                        {room.building_name} - Căn #{room.room_number}
+                        {room.buildingName} - Căn #{room.roomNumber}
                       </h3>
                       <p itemProp="address" className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                         <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span>{room.building_address}</span>
+                        <span>{room.buildingAddress}</span>
                       </p>
 
                       <div className="mt-3.5 flex items-center gap-4 text-xs text-slate-600 pb-3 border-b border-slate-100">
@@ -309,7 +311,7 @@ export const PropertyExplorer: React.FC<PropertyExplorerProps> = ({ onOpenAuthMo
                           <span>{room.capacity} Người</span>
                         </span>
                         <span className="text-slate-500 font-medium">
-                          Tầng {room.floor_number}
+                          Tầng {room.floorNumber}
                         </span>
                       </div>
                     </div>
@@ -318,14 +320,14 @@ export const PropertyExplorer: React.FC<PropertyExplorerProps> = ({ onOpenAuthMo
                       <div>
                         <span className="text-[11px] text-slate-400 block">Giá thuê niêm yết:</span>
                         <span className="text-lg font-extrabold text-blue-600" itemProp="price">
-                          {room.base_rent.toLocaleString()} <span className="text-xs font-normal text-slate-500">VND/tháng</span>
+                          {(room.baseRent ?? 0).toLocaleString()} <span className="text-xs font-normal text-slate-500">VND/tháng</span>
                         </span>
                       </div>
 
                       <button
                         onClick={() => setSelectedRoom(room)}
                         className="px-4 py-2 bg-slate-900 hover:bg-blue-600 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                        aria-label={`Xem chi tiết phòng ${room.room_number}`}
+                        aria-label={`Xem chi tiết phòng ${room.roomNumber}`}
                       >
                         <span>Chi tiết phòng</span>
                         <ArrowRight className="w-3.5 h-3.5" />

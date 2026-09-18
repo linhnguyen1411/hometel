@@ -1,6 +1,6 @@
 const API_BASE = '/api/v1';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   code: string;
   constructor(message: string, code: string) {
     super(message);
@@ -9,9 +9,14 @@ class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('property_token');
+  const token = typeof window !== 'undefined' ? localStorage.getItem('property_token') : null;
   const headers = new Headers(options.headers || {});
-  headers.set('Content-Type', 'application/json');
+
+  if (!(options.body instanceof FormData)) {
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+  }
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -22,15 +27,23 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers
   });
 
-  const json = await response.json();
+  const text = await response.text();
+  let json: any = null;
 
-  if (!response.ok || json.success === false) {
-    const errorMsg = json.error?.message || response.statusText || 'An error occurred';
-    const errorCode = json.error?.code || 'API_ERROR';
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    const errorMsg = text || response.statusText || `Request failed with status ${response.status}`;
+    throw new ApiError(errorMsg, `HTTP_${response.status}`);
+  }
+
+  if (!response.ok || json?.success === false) {
+    const errorMsg = json?.error?.message || response.statusText || 'An error occurred';
+    const errorCode = json?.error?.code || `HTTP_${response.status}`;
     throw new ApiError(errorMsg, errorCode);
   }
 
-  return json.data as T;
+  return (json?.data !== undefined ? json.data : json) as T;
 }
 
 export const api = {
@@ -66,10 +79,10 @@ export const api = {
   getAuditLogs: (params: string = '') => request<any[]>(`/admin/audit-logs?${params}`),
 
   // Companies & Staff
-  getCompany: (id: string) => request<any>(`/companies/${id}`),
-  getCompanyStaff: (id: string) => request<any[]>(`/companies/${id}/staff`),
+  getCompany: (id: string) => request<any>(`/admin/companies`),
+  getCompanyStaff: (id: string) => request<any[]>(`/admin/users`),
   createStaff: (companyId: string, data: any) =>
-    request<any>(`/companies/${companyId}/staff`, {
+    request<any>(`/auth/register`, {
       method: 'POST',
       body: JSON.stringify(data)
     }),
@@ -78,10 +91,54 @@ export const api = {
   getBuildings: (params: string = '') => request<any[]>(`/buildings?${params}`),
   getBuildingById: (id: string) => request<any>(`/buildings/${id}`),
   getBuildingBySlug: (slug: string) => request<any>(`/buildings/slug/${slug}`),
+  downloadBuildingTemplate: async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('property_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch('/api/v1/buildings/import-template', { headers });
+    if (!res.ok) throw new Error('Không thể tải template');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'homtel_building_import_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+  importBuildings: (formData: FormData) =>
+    request<any>('/buildings/import', {
+      method: 'POST',
+      body: formData
+    }),
   createBuilding: (data: any) =>
     request<any>('/buildings', {
       method: 'POST',
       body: JSON.stringify(data)
+    }),
+  updateBuilding: (id: string, data: any) =>
+    request<any>(`/buildings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+  deleteBuilding: (id: string) =>
+    request<any>(`/buildings/${id}`, {
+      method: 'DELETE'
+    }),
+  createFloor: (buildingId: string, data: { floorNumber: number; name: string; description?: string }) =>
+    request<any>(`/buildings/${buildingId}/floors`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  updateFloor: (floorId: string, data: any) =>
+    request<any>(`/floors/${floorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+  deleteFloor: (floorId: string) =>
+    request<any>(`/floors/${floorId}`, {
+      method: 'DELETE'
     }),
   addBuildingConfig: (buildingId: string, data: any) =>
     request<any>(`/buildings/${buildingId}/configurations`, {
@@ -102,7 +159,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(data)
     }),
-  getMetersByRoom: (roomId: string) => request<any[]>(`/meters/room/${roomId}`),
+  deleteRoom: (id: string) =>
+    request<any>(`/rooms/${id}`, {
+      method: 'DELETE'
+    }),
+  getMetersByRoom: (roomId: string) => request<any[]>(`/billing/meters/room/${roomId}`),
 
   // Rentals & Applications
   applyForRoom: (data: any) =>
@@ -127,7 +188,7 @@ export const api = {
       body: JSON.stringify(data)
     }),
   sendContractOtp: (contractId: string, channel: 'ZALO' | 'SMS' = 'ZALO') =>
-    request<any>(`/contracts/${contractId}/send-otp`, {
+    request<any>(`/contracts/${contractId}/request-otp`, {
       method: 'POST',
       body: JSON.stringify({ channel })
     }),
@@ -136,28 +197,73 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data)
     }),
-  getContractEvidence: (contractId: string) => request<any>(`/contracts/${contractId}/evidence`),
-
-  // Meters & Readings
-  getRoomMeters: (roomId: string) => request<any[]>(`/meters/room/${roomId}`),
-  recordMeterReading: (data: any) =>
-    request<any>('/meters/readings', {
+  renewContract: (contractId: string, data: { newEndDate: string; newRentAmount?: number; notes?: string }) =>
+    request<any>(`/contracts/${contractId}/renew`, {
       method: 'POST',
       body: JSON.stringify(data)
     }),
+  terminateContract: (contractId: string, data?: { terminationDate?: string; reason?: string }) =>
+    request<any>(`/contracts/${contractId}/terminate`, {
+      method: 'POST',
+      body: JSON.stringify(data || {})
+    }),
+  getContractEvidence: (contractId: string) => request<any>(`/contracts/${contractId}/evidence`),
+
+  // Meters & Readings
+  getRoomMeters: (roomId: string) => request<any[]>(`/billing/meters/room/${roomId}`),
+  downloadMeterTemplate: async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('property_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch('/api/v1/billing/meters/import-template', { headers });
+    if (!res.ok) throw new Error('Không thể tải template');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'homtel_meter_import_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+  importMeters: (formData: FormData) =>
+    request<any>('/billing/meters/bulk-import', {
+      method: 'POST',
+      body: formData
+    }),
+  recordMeterReading: (meterIdOrData: string | any, payload?: any) => {
+    if (typeof meterIdOrData === 'string') {
+      return request<any>(`/billing/meters/${meterIdOrData}/commit-ocr`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {})
+      });
+    }
+    const meterId = meterIdOrData.meterId;
+    return request<any>(`/billing/meters/${meterId}/commit-ocr`, {
+      method: 'POST',
+      body: JSON.stringify(meterIdOrData)
+    });
+  },
 
   // Invoices & Billing
-  getInvoices: (params: string = '') => request<any[]>(`/invoices?${params}`),
-  getInvoiceById: (id: string) => request<any>(`/invoices/${id}`),
+  getInvoices: (params: string = '') => request<any[]>(`/billing/invoices?${params}`),
+  getInvoiceById: (id: string) => request<any>(`/billing/invoices/${id}`),
+  getInvoiceVietQr: (id: string) => request<any>(`/billing/invoices/${id}/vietqr`),
   generateInvoice: (data: any) =>
-    request<any>('/invoices/generate', {
+    request<any>('/billing/invoices', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  generateMonthlyInvoices: (data: { buildingId?: string; period?: string; billing_month?: string; dueDate?: string } = {}) =>
+    request<any>('/billing/invoices/generate-monthly', {
       method: 'POST',
       body: JSON.stringify(data)
     }),
 
   // Payments
   processPayment: (data: any) =>
-    request<any>('/payments', {
+    request<any>('/billing/payments', {
       method: 'POST',
       body: JSON.stringify(data)
     }),

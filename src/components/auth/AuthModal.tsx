@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useAuth, DEMO_USERS } from '../../context/AuthContext.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+﻿import React, { useState } from 'react';
+import { useAuth, DEMO_USERS } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { X, ShieldAlert, Sparkles } from 'lucide-react';
 
 interface AuthModalProps {

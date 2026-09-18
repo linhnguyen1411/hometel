@@ -65,8 +65,10 @@ export interface Building {
 
 export interface Floor {
   id: string;
-  building_id: string;
-  floor_number: number;
+  buildingId: string;
+  building_id?: string;
+  floorNumber: number;
+  floor_number?: number;
   name: string;
   description?: string | null;
   status: string;
@@ -74,23 +76,33 @@ export interface Floor {
 
 export interface Room {
   id: string;
-  floor_id: string;
-  building_id: string;
-  room_number: string;
+  floorId: string;
+  floor_id?: string;
+  buildingId: string;
+  building_id?: string;
+  roomNumber: string;
+  room_number?: string;
   slug: string;
-  room_type: RoomType;
+  roomType: RoomType;
+  room_type?: RoomType;
   area: number;
-  base_rent: number;
+  baseRent: number;
+  base_rent?: number;
   capacity: number;
   status: RoomStatus;
   description?: string | null;
   amenities?: string[] | string;
   images?: string[] | string;
   furnishing: FurnishingStatus;
+  buildingName?: string;
   building_name?: string;
+  buildingSlug?: string;
   building_slug?: string;
+  buildingAddress?: string;
   building_address?: string;
+  buildingCity?: string;
   building_city?: string;
+  floorNumber?: number;
   floor_number?: number;
   equipment?: Equipment[];
 }
@@ -163,6 +175,8 @@ export interface RentalContract {
   building_name?: string;
   tenant_name?: string;
   tenant_email?: string;
+  signed_at?: string | null;
+  signature_hash?: string | null;
   deposit?: Deposit;
 }
 
@@ -185,6 +199,8 @@ export interface Meter {
   room_id: string;
   type: 'ELECTRICITY' | 'WATER' | 'GAS';
   serial_number: string;
+  meter_serial?: string;
+  unit?: string;
   initial_reading: number;
   current_reading: number;
   status: string;
@@ -255,16 +271,21 @@ export interface Payment {
 
 export interface Service {
   id: string;
-  company_id: string;
+  company_id?: string;
+  companyId?: string;
   name: string;
   slug: string;
   description?: string | null;
   category: string;
-  price_type: string;
-  base_price: number;
+  price_type?: string;
+  priceType?: string;
+  base_price?: number;
+  basePrice?: number;
   image_url?: string | null;
+  imageUrl?: string | null;
   status: string;
   company_name?: string;
+  companyName?: string;
 }
 
 export interface ServiceRequest {

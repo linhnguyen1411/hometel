@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../services/api.js';
-import { Notification } from '../types/index.js';
-import { useLanguage } from '../context/LanguageContext.js';
+﻿import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
+import { Notification } from '../types/index';
+import { useLanguage } from '../context/LanguageContext';
 import { Bell, CheckCheck, Clock, ExternalLink } from 'lucide-react';
 
 interface NotificationsModalProps {

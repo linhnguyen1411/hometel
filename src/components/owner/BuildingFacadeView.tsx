@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Building360Data } from '../../types/index.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { Building360Data } from '../../types/index';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Building2,
   Home,
@@ -208,7 +208,7 @@ export const BuildingFacadeView: React.FC<BuildingFacadeViewProps> = ({
                             </div>
 
                             <div className="text-[10px] text-blue-400 font-mono font-bold">
-                              {room.base_rent.toLocaleString()} đ
+                              {(room.baseRent ?? room.base_rent)?.toLocaleString() ?? '—'} đ
                             </div>
                           </div>
 

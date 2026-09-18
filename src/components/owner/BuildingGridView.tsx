@@ -1,6 +1,6 @@
 import React from 'react';
-import { Building360Data } from '../../types/index.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { Building360Data } from '../../types/index';
+import { useLanguage } from '../../context/LanguageContext';
 import { User, Zap, Droplets, ArrowRight } from 'lucide-react';
 
 interface BuildingGridViewProps {
@@ -115,7 +115,7 @@ export const BuildingGridView: React.FC<BuildingGridViewProps> = ({
                         )}
 
                         <span className="text-blue-600 font-bold font-mono block">
-                          {room.base_rent.toLocaleString()} đ
+                          {(room.baseRent ?? room.base_rent)?.toLocaleString() ?? '—'} đ
                         </span>
                       </div>
                     </div>

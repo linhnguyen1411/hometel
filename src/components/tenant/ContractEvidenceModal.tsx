@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+﻿import React, { useEffect, useState } from 'react';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import { X, ShieldCheck, CheckCircle2, Copy, Check, FileText } from 'lucide-react';
 
 interface ContractEvidenceModalProps {

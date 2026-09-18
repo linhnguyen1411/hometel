@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { ActionItem } from '../../types/index.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { ActionItem } from '../../types/index';
 import {
   AlertCircle,
   Clock,
@@ -238,9 +238,9 @@ export const ActionCenterView: React.FC<ActionCenterViewProps> = ({
                     <h4 className="text-sm font-bold text-slate-900">{act.title}</h4>
                   </div>
                   <p className="text-xs text-slate-500">{act.subtitle}</p>
-                  {act.amount && (
+                  {act.amount != null && (
                     <span className="text-xs font-black text-blue-700 block">
-                      Số tiền liên quan: {act.amount.toLocaleString()} VND
+                      Số tiền liên quan: {act.amount?.toLocaleString()} VND
                     </span>
                   )}
                 </div>

@@ -12,26 +12,19 @@ logger = logging.getLogger("homtel.database")
 
 os.makedirs("./data", exist_ok=True)
 
-# Try connecting or fallback gracefully for local development
-if settings.USE_SQLITE_FALLBACK or "sqlite" in settings.DATABASE_URL:
-    active_url = settings.SQLITE_FALLBACK_URL
-    engine = create_async_engine(active_url, echo=False, future=True)
-else:
-    # Use postgresql by default with SQLite dev fallback option
-    try:
-        active_url = settings.DATABASE_URL
-        engine = create_async_engine(
-            active_url,
-            echo=False,
-            future=True,
-            pool_size=10,
-            max_overflow=5,
-            pool_pre_ping=True,
-        )
-    except Exception as e:
-        logger.warning(f"Failed to initialize PostgreSQL engine: {e}. Falling back to SQLite.")
-        active_url = settings.SQLITE_FALLBACK_URL
-        engine = create_async_engine(active_url, echo=False, future=True)
+import sys
+from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
+
+is_testing = "pytest" in sys.modules or os.environ.get("TESTING")
+
+# Strictly PostgreSQL Async Engine via asyncpg
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    future=True,
+    poolclass=NullPool if is_testing else AsyncAdaptedQueuePool,
+    **({} if is_testing else {"pool_size": 10, "max_overflow": 5, "pool_pre_ping": True}),
+)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

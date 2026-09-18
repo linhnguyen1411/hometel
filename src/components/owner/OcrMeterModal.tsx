@@ -1,6 +1,6 @@
 ﻿import React, { useState, useRef } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   X,
   Camera,

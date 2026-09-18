@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useAuth } from '../../context/AuthContext.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { RentalContract, Invoice, ServiceRequest, RentalApplication } from '../../types/index.js';
-import { PaymentModal } from './PaymentModal.js';
-import { QuickServiceModal } from './QuickServiceModal.js';
-import { ContractSigningModal } from './ContractSigningModal.js';
-import { ContractEvidenceModal } from './ContractEvidenceModal.js';
-import { WorkOrderReviewModal } from './WorkOrderReviewModal.js';
-import { PwaInstallPrompt } from '../pwa/PwaInstallPrompt.js';
-import { PortalShell, PortalMenuItem } from '../layout/PortalShell.js';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { RentalContract, Invoice, ServiceRequest, RentalApplication } from '../../types/index';
+import { PaymentModal } from './PaymentModal';
+import { QuickServiceModal } from './QuickServiceModal';
+import { ContractSigningModal } from './ContractSigningModal';
+import { ContractEvidenceModal } from './ContractEvidenceModal';
+import { WorkOrderReviewModal } from './WorkOrderReviewModal';
+import { PwaInstallPrompt } from '../pwa/PwaInstallPrompt';
+import { PortalShell, PortalMenuItem } from '../layout/PortalShell';
 import { Home, Receipt, Wrench, Shield, CheckCircle2, Plus, FileText, Sparkles, PenTool, ShieldCheck, Star, Bell, BellOff, WifiOff } from 'lucide-react';
 
 interface TenantDashboardProps {
@@ -368,7 +368,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
 
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                       <span className="text-slate-400 block font-semibold">{t('tenant.rent_amount')}</span>
-                      <span className="font-bold text-blue-600 text-sm mt-0.5 block">{activeContract.rent_amount.toLocaleString()} VND</span>
+                      <span className="font-bold text-blue-600 text-sm mt-0.5 block">{((activeContract as any).rentAmount ?? activeContract.rent_amount)?.toLocaleString() ?? '—'} VND</span>
                     </div>
 
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -390,7 +390,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
                       {t('tenant.deposit')}
                     </div>
                     <h3 className="text-2xl font-black text-slate-900">
-                      {activeContract.deposit_amount.toLocaleString()} <span className="text-xs font-normal text-slate-500">VND</span>
+                      {((activeContract as any).depositAmount ?? activeContract.deposit_amount)?.toLocaleString() ?? '—'} <span className="text-xs font-normal text-slate-500">VND</span>
                     </h3>
                     <p className="text-xs text-slate-500 mt-1">
                       {t('modal.apply_desc')}
@@ -448,7 +448,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <span className="text-[10px] text-slate-400 block font-semibold">{t('payment.total_amount')}</span>
-                        <span className="text-base font-black text-slate-900">{inv.total.toLocaleString()} VND</span>
+                        <span className="text-base font-black text-slate-900">{((inv as any).totalAmount ?? inv.total ?? 0).toLocaleString()} VND</span>
                       </div>
 
                       {inv.status !== 'PAID' && (
@@ -456,7 +456,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
                           onClick={() => setPayingInvoice(inv)}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-xs"
                         >
-                          {t('tenant.pay_now')} ({inv.outstanding_amount.toLocaleString()} VND)
+                          {t('tenant.pay_now')} ({((inv as any).outstandingAmount ?? inv.outstanding_amount ?? 0).toLocaleString()} VND)
                         </button>
                       )}
                     </div>
@@ -473,7 +473,7 @@ export const TenantDashboard: React.FC<TenantDashboardProps> = ({ onBrowseServic
                               <span className="font-semibold text-slate-800 block">{item.description}</span>
                               <span className="text-[11px] text-slate-400">× {item.quantity}</span>
                             </div>
-                            <span className="font-bold text-slate-900">{item.amount.toLocaleString()} VND</span>
+                            <span className="font-bold text-slate-900">{(item.amount ?? 0).toLocaleString()} VND</span>
                           </div>
                         ))}
                       </div>

@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from typing import List, Optional
 from datetime import date
 from sqlalchemy import String, Numeric, Integer, Float, ForeignKey, Text, JSON, Date, UniqueConstraint
@@ -55,8 +56,8 @@ class Room(Base, TimestampMixin):
     room_number: Mapped[str] = mapped_column(String(50), nullable=False)
     slug: Mapped[str] = mapped_column(String(150), unique=True, index=True, nullable=False)
     room_type: Mapped[str] = mapped_column(String(50), default="STUDIO", nullable=False)
-    area: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
-    base_rent: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    area: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
+    base_rent: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     capacity: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="AVAILABLE", index=True, nullable=False)
     furnishing: Mapped[str] = mapped_column(String(30), default="FULLY_FURNISHED", nullable=False)
@@ -80,13 +81,13 @@ class BuildingConfiguration(Base, TimestampMixin):
     effective_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # Unit rates (VND)
-    electricity_unit_price: Mapped[float] = mapped_column(Numeric(10, 2), default=3500, nullable=False)
-    water_unit_price: Mapped[float] = mapped_column(Numeric(10, 2), default=15000, nullable=False)
-    internet_price: Mapped[float] = mapped_column(Numeric(12, 2), default=100000, nullable=False)
-    garbage_price: Mapped[float] = mapped_column(Numeric(12, 2), default=50000, nullable=False)
-    parking_fee_motorbike: Mapped[float] = mapped_column(Numeric(12, 2), default=100000, nullable=False)
-    parking_fee_car: Mapped[float] = mapped_column(Numeric(12, 2), default=800000, nullable=False)
-    cleaning_fee: Mapped[float] = mapped_column(Numeric(12, 2), default=150000, nullable=False)
+    electricity_unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("3500.00"), nullable=False)
+    water_unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("15000.00"), nullable=False)
+    internet_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("100000.00"), nullable=False)
+    garbage_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("50000.00"), nullable=False)
+    parking_fee_motorbike: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("100000.00"), nullable=False)
+    parking_fee_car: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("800000.00"), nullable=False)
+    cleaning_fee: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("150000.00"), nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     building: Mapped["Building"] = relationship("Building", back_populates="configurations")

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useAuth } from '../../context/AuthContext.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { PortalShell, PortalMenuItem } from '../layout/PortalShell.js';
-import { Service, ServiceRequest } from '../../types/index.js';
-import { SmartWorkOrderModal } from './SmartWorkOrderModal.js';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { PortalShell, PortalMenuItem } from '../layout/PortalShell';
+import { Service, ServiceRequest } from '../../types/index';
+import { SmartWorkOrderModal } from './SmartWorkOrderModal';
 import { Wrench, Sparkles, Users, CheckCircle2, Clock, Plus, AlertTriangle, ArrowRight, Eye, ClipboardList, Star } from 'lucide-react';
 
 export const ProviderDashboard: React.FC = () => {
@@ -340,7 +340,7 @@ export const ProviderDashboard: React.FC = () => {
                   {s.category}
                 </span>
                 <span className="text-xs font-bold text-slate-800">
-                  {s.base_price.toLocaleString()} VND ({s.price_type.toLowerCase()})
+                  {((s.basePrice ?? s.base_price) ?? 0).toLocaleString()} VND ({((s.priceType ?? s.price_type) || '').toLowerCase()})
                 </span>
               </div>
               <h3 className="font-bold text-slate-900 text-sm">{s.name}</h3>
@@ -690,8 +690,8 @@ export const ProviderDashboard: React.FC = () => {
       <SmartWorkOrderModal
         request={smartOrderRequest}
         onClose={() => setSmartOrderRequest(null)}
-        onUpdateStatus={async (id, status, actualCost) => {
-          await handleUpdateStatus(id, status, actualCost);
+        onStatusUpdated={async () => {
+          await fetchData();
           setSmartOrderRequest(null);
         }}
       />

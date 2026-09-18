@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Language, SUPPORTED_LANGUAGES, LanguageOption, translations } from '../i18n/translations.js';
+import { Language, SUPPORTED_LANGUAGES, LanguageOption, translations } from '../i18n/translations';
 
 interface LanguageContextType {
   language: Language;
@@ -13,9 +13,11 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem('homtel_language') as Language;
-    if (saved && ['vi', 'en', 'ko', 'zh', 'ja'].includes(saved)) {
-      return saved;
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('homtel_language') as Language;
+      if (saved && ['vi', 'en', 'ko', 'zh', 'ja'].includes(saved)) {
+        return saved;
+      }
     }
     return 'vi';
   });

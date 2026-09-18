@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useLanguage } from '../context/LanguageContext.js';
+﻿import React, { useState, useRef, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { Globe, ChevronDown, Check } from 'lucide-react';
-import { Language } from '../i18n/translations.js';
+import { Language } from '../i18n/translations';
 
 interface LanguageSelectorProps {
   variant?: 'compact' | 'sidebar';

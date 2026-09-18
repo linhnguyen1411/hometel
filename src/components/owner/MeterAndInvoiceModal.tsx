@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Room, Meter } from '../../types/index.js';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { Zap, Receipt, Check, AlertCircle, X } from 'lucide-react';
+import { Room, Meter } from '../../types/index';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { Zap, Receipt, Check, AlertCircle, X, Download, Upload, FileSpreadsheet } from 'lucide-react';
 
 interface MeterAndInvoiceModalProps {
   room: Room | null;
@@ -22,6 +22,11 @@ export const MeterAndInvoiceModal: React.FC<MeterAndInvoiceModalProps> = ({ room
   const [savingReading, setSavingReading] = useState(false);
   const [readingSuccess, setReadingSuccess] = useState(false);
   const [readingError, setReadingError] = useState<string | null>(null);
+
+  // Bulk Excel import meter state
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importingMeters, setImportingMeters] = useState(false);
+  const [meterImportMsg, setMeterImportMsg] = useState<string | null>(null);
 
   // Generate Invoice state
   const [billingMonth, setBillingMonth] = useState<string>('2026-09');
@@ -55,10 +60,11 @@ export const MeterAndInvoiceModal: React.FC<MeterAndInvoiceModalProps> = ({ room
     setSavingReading(true);
     setReadingError(null);
     try {
-      await api.recordMeterReading({
-        meterId: currentMeter.id,
+      await api.recordMeterReading(currentMeter.id, {
         readingValue,
-        readingDate
+        readingDate,
+        notes: 'Ghi số thủ công',
+        ocrConfidence: null
       });
       setReadingSuccess(true);
       const res = await api.getRoomMeters(room.id);
@@ -68,6 +74,34 @@ export const MeterAndInvoiceModal: React.FC<MeterAndInvoiceModalProps> = ({ room
       setReadingError(err.message || 'Failed to record meter reading');
     } finally {
       setSavingReading(false);
+    }
+  };
+
+  const handleDownloadMeterTemplate = async () => {
+    try {
+      await api.downloadMeterTemplate();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi tải template Excel');
+    }
+  };
+
+  const handleBulkImportMeters = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportingMeters(true);
+    setMeterImportMsg(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.importMeters(formData);
+      setMeterImportMsg(res.message || 'Import thành công!');
+      const updatedMeters = await api.getRoomMeters(room.id);
+      setMeters(updatedMeters);
+      setTimeout(() => setMeterImportMsg(null), 3000);
+    } catch (err: any) {
+      setMeterImportMsg(err.message || 'Lỗi khi import file Excel');
+    } finally {
+      setImportingMeters(false);
     }
   };
 
@@ -111,10 +145,40 @@ export const MeterAndInvoiceModal: React.FC<MeterAndInvoiceModalProps> = ({ room
 
         {/* Section 1: Record Meter Reading */}
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-          <h4 className="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-amber-500" />
-            {t('btn.record_meter')}
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-amber-500" />
+              {t('btn.record_meter', 'Ghi số công tơ thủ công')}
+            </h4>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={handleDownloadMeterTemplate}
+                className="text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold flex items-center gap-1"
+                title="Tải file Excel mẫu để ghi số hàng loạt"
+              >
+                <Download className="w-3 h-3" />
+                <span>Mẫu Excel</span>
+              </button>
+              <label className="cursor-pointer text-blue-600 hover:text-blue-800 text-[11px] font-semibold flex items-center gap-1">
+                <Upload className="w-3 h-3" />
+                <span>{importingMeters ? 'Đang import...' : 'Import Excel'}</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  disabled={importingMeters}
+                  onChange={handleBulkImportMeters}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+
+          {meterImportMsg && (
+            <div className="p-2 bg-blue-50 text-blue-800 rounded-lg border border-blue-200 text-xs font-semibold">
+              {meterImportMsg}
+            </div>
+          )}
 
           {meters.length === 0 ? (
             <p className="text-xs text-slate-500">{t('tenant.no_requests')}</p>

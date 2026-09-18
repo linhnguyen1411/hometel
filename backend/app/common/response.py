@@ -29,4 +29,6 @@ def error_response(
         meta=None,
         error=ErrorDetail(code=code, message=message, details=details),
     )
-    return JSONResponse(content=response_model.model_dump(mode="json"), status_code=status_code)
+    content = response_model.model_dump(mode="json")
+    content["detail"] = message
+    return JSONResponse(content=content, status_code=status_code)

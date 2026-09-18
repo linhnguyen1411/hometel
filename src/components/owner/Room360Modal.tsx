@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { Room360Data } from '../../types/index.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { Room360Data } from '../../types/index';
 import {
   X,
   Home,
@@ -271,9 +271,9 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                       <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200">
                         <span className="text-xs text-slate-400 font-medium">Giá thuê hàng tháng</span>
                         <span className="text-base font-black text-blue-700">
-                          {data.tenant.rentAmount.toLocaleString()} <span className="text-xs font-normal text-slate-500">VND</span>
+                          {((data.tenant as any)?.rentAmount ?? (data.activeContract as any)?.rentAmount ?? data.activeContract?.rent_amount ?? data.room?.baseRent ?? data.room?.base_rent)?.toLocaleString() ?? '—'} <span className="text-xs font-normal text-slate-500">VND</span>
                         </span>
-                        <span className="text-[11px] text-slate-400 mt-0.5">Hợp đồng #{data.tenant.contractNumber}</span>
+                        <span className="text-[11px] text-slate-400 mt-0.5">Hợp đồng #{(data.tenant as any)?.contractNumber || (data.activeContract as any)?.contractNumber || data.activeContract?.contract_number || '—'}</span>
                       </div>
                     </div>
                   ) : (
@@ -301,7 +301,7 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <span className="text-slate-400 text-[11px] font-semibold block">Giá niêm yết</span>
                       <span className="text-sm font-bold text-slate-800 mt-0.5 block">
-                        {data.room.base_rent.toLocaleString()} VND
+                        {(data.room.baseRent ?? data.room.base_rent)?.toLocaleString() ?? '—'} VND
                       </span>
                     </div>
 
@@ -328,18 +328,25 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                   </div>
 
                   {/* Amenities */}
-                  {data.room.amenities && data.room.amenities.length > 0 && (
-                    <div>
-                      <span className="text-xs font-bold text-slate-700 block mb-2">Tiện ích trong phòng</span>
-                      <div className="flex flex-wrap gap-2">
-                        {data.room.amenities.map((am: string, i: number) => (
-                          <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs rounded-lg font-medium">
-                            {am}
-                          </span>
-                        ))}
+                  {(() => {
+                    const amenitiesList = Array.isArray(data.room.amenities)
+                      ? data.room.amenities
+                      : typeof data.room.amenities === 'string'
+                      ? JSON.parse(data.room.amenities || '[]')
+                      : [];
+                    return amenitiesList.length > 0 ? (
+                      <div>
+                        <span className="text-xs font-bold text-slate-700 block mb-2">Tiện ích trong phòng</span>
+                        <div className="flex flex-wrap gap-2">
+                          {amenitiesList.map((am: string, i: number) => (
+                            <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs rounded-lg font-medium">
+                              {am}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null;
+                  })()}
                 </div>
               )}
 
@@ -371,13 +378,13 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                           <div className="p-3 bg-slate-50 rounded-xl">
                             <span className="text-slate-400 block font-semibold">Tiền thuê hàng tháng</span>
                             <span className="font-bold text-blue-600 text-sm mt-0.5 block">
-                              {data.activeContract.rent_amount.toLocaleString()} VND
+                              {((data.activeContract as any)?.rentAmount ?? data.activeContract.rent_amount)?.toLocaleString() ?? '—'} VND
                             </span>
                           </div>
                           <div className="p-3 bg-slate-50 rounded-xl">
                             <span className="text-slate-400 block font-semibold">Ngày chốt hóa đơn</span>
                             <span className="font-bold text-slate-800 text-sm mt-0.5 block">
-                              Ngày {data.activeContract.payment_day_of_month} hàng tháng
+                              Ngày {data.activeContract.payment_day_of_month || (data.activeContract as any)?.paymentDayOfMonth || 1} hàng tháng
                             </span>
                           </div>
                         </div>
@@ -389,25 +396,20 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                               <Shield className="w-5 h-5 text-emerald-600" />
                               <div>
                                 <span className="text-xs font-bold text-emerald-900">
-                                  Tiền ký quỹ (Đặt cọc an ninh): {data.deposit.amount.toLocaleString()} VND
+                                  Tiền ký quỹ (Đặt cọc an ninh): {(data.deposit.amount ?? (data.deposit as any)?.depositAmount ?? 0).toLocaleString()} VND
                                 </span>
                                 <span className="text-[11px] text-emerald-700 block">
-                                  Trạng thái: {data.deposit.status} • Ngày nhận: {data.deposit.received_date || 'N/A'}
+                                  Trạng thái: {data.deposit.status} • Ngày nhận: {data.deposit.received_date || (data.deposit as any)?.receivedDate || 'N/A'}
                                 </span>
                               </div>
                             </div>
-                            <span className="px-2 py-0.5 bg-emerald-200 text-emerald-800 text-[11px] font-bold rounded">
-                              ĐÃ GIỮ CỌC
-                            </span>
                           </div>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
-                      <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                      <p className="text-sm font-semibold text-slate-700">Chưa có hợp đồng thuê hoạt động</p>
-                      <p className="text-xs text-slate-400 mt-1">Khi khách thuê được duyệt hồ sơ, hợp đồng sẽ xuất hiện tại đây.</p>
+                    <div className="p-8 text-center text-slate-400">
+                      Chưa có hợp đồng nào đang kích hoạt.
                     </div>
                   )}
                 </div>
@@ -418,7 +420,7 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Lịch sử hóa đơn phòng ({data.invoices.length})
+                      Lịch sử hóa đơn phòng ({data.invoices?.length || 0})
                     </span>
                     {onOpenMeterModal && (
                       <button
@@ -431,7 +433,7 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                     )}
                   </div>
 
-                  {data.invoices.length > 0 ? (
+                  {data.invoices && data.invoices.length > 0 ? (
                     <div className="space-y-2">
                       {data.invoices.map((inv) => (
                         <div
@@ -440,7 +442,9 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                         >
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-xs text-slate-900">{inv.invoice_number}</span>
+                              <span className="font-mono font-bold text-xs text-slate-900">
+                                {inv.invoice_number || (inv as any).invoiceNumber || `#${inv.id?.slice(0, 8)}`}
+                              </span>
                               <span
                                 className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                                   inv.status === 'PAID'
@@ -454,18 +458,18 @@ export const Room360Modal: React.FC<Room360ModalProps> = ({
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Kỳ phí tháng {inv.billing_month} • Ngày phát hành: {inv.issue_date} • Hạn nộp: {inv.due_date}
+                              Kỳ phí tháng {inv.billing_month || (inv as any).periodMonth || '—'} • Ngày phát hành: {inv.issue_date || (inv as any).issueDate || '—'} • Hạn nộp: {inv.due_date || (inv as any).dueDate || '—'}
                             </p>
                           </div>
 
                           <div className="flex items-center gap-3 justify-between sm:justify-end">
                             <div className="text-right">
                               <span className="text-sm font-black text-slate-900 block">
-                                {inv.total.toLocaleString()} VND
+                                {((inv as any).totalAmount ?? inv.total ?? 0).toLocaleString()} VND
                               </span>
-                              {inv.outstanding_amount && inv.outstanding_amount > 0 ? (
+                              {(inv.outstanding_amount ?? (inv as any).outstandingAmount ?? 0) > 0 ? (
                                 <span className="text-[11px] text-red-600 font-semibold">
-                                  Còn nợ: {inv.outstanding_amount.toLocaleString()} VND
+                                  Còn nợ: {((inv as any).outstandingAmount ?? inv.outstanding_amount ?? 0).toLocaleString()} VND
                                 </span>
                               ) : (
                                 <span className="text-[11px] text-emerald-600 font-semibold">Đã thanh toán đủ</span>

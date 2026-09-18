@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Room, Building } from '../../types/index.js';
-import { api } from '../../services/api.js';
-import { useAuth } from '../../context/AuthContext.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { Room, Building } from '../../types/index';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { X, MapPin, Maximize2, Users, Check, Sparkles, Send, ShieldAlert, Cpu } from 'lucide-react';
 
 interface RoomDetailModalProps {
@@ -106,7 +106,7 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose,
         <div className="relative h-64 sm:h-80 bg-slate-900 overflow-hidden">
           <img
             src={imagesList[0]}
-            alt={`Room ${currentRoom.room_number}`}
+            alt={`Room ${currentRoom.roomNumber}`}
             className="w-full h-full object-cover opacity-90"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
@@ -122,10 +122,10 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose,
             <div>
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="bg-blue-600 text-white font-bold px-2.5 py-0.5 rounded text-xs">
-                  {t('explorer.room_number')} {currentRoom.room_number}
+                  {t('explorer.room_number')} {currentRoom.roomNumber}
                 </span>
                 <span className="bg-white/90 text-slate-800 font-semibold px-2 py-0.5 rounded text-xs">
-                  {formatRoomType(currentRoom.room_type)}
+                  {formatRoomType(currentRoom.roomType)}
                 </span>
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                   currentRoom.status === 'AVAILABLE' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
@@ -134,18 +134,18 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose,
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">
-                {currentRoom.building_name || building?.name}
+                {currentRoom.buildingName || building?.name}
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 flex items-center gap-1 mt-1">
                 <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                {currentRoom.building_address || building?.address}
+                {currentRoom.buildingAddress || building?.address}
               </p>
             </div>
 
             <div className="text-right">
               <span className="text-xs text-slate-300 block">{t('explorer.monthly_rent')}</span>
               <span className="text-xl sm:text-2xl font-black text-white">
-                {currentRoom.base_rent.toLocaleString()} <span className="text-xs font-normal">VND</span>
+                {(currentRoom.baseRent ?? 0).toLocaleString()} <span className="text-xs font-normal">VND</span>
               </span>
             </div>
           </div>
@@ -171,7 +171,7 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose,
               <span className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600" /> {t('explorer.floor')}
               </span>
-              <span className="text-sm font-bold text-slate-800">{currentRoom.floor_number}</span>
+              <span className="text-sm font-bold text-slate-800">{currentRoom.floorNumber}</span>
             </div>
           </div>
 
@@ -328,7 +328,7 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose,
                 <div>
                   <span className="text-xs text-slate-500">{t('tenant.deposit')}</span>
                   <p className="text-sm font-bold text-slate-800">
-                    1 Month ({currentRoom.base_rent.toLocaleString()} VND)
+                    1 Month ({(currentRoom.baseRent ?? 0).toLocaleString()} VND)
                   </p>
                 </div>
 

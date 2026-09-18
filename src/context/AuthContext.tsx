@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '../types/index.js';
-import { api } from '../services/api.js';
+import { User } from '../types/index';
+import { api } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  loading: boolean;
   activeCompanyId: string | null;
   setActiveCompanyId: (id: string | null) => void;
   login: (email: string, password: string) => Promise<void>;
@@ -17,17 +18,17 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const DEMO_USERS = {
-  SUPER_ADMIN: { email: 'admin@propertyv1.com', password: 'Admin@123', label: 'Super Admin', sub: 'Global Platform Control' },
-  OWNER: { email: 'owner1@greenliving.com', password: 'Owner@123', label: 'Property Owner', sub: 'Green Living Real Estate' },
-  PROVIDER: { email: 'cleanmaster@clean.com', password: 'Provider@123', label: 'Service Provider', sub: 'CleanMaster Pro Services' },
-  STAFF: { email: 'staff1@greenliving.com', password: 'Staff@123', label: 'Property Staff', sub: 'Nguyen Bao Chau' },
-  TENANT: { email: 'tenant1@gmail.com', password: 'Tenant@123', label: 'Active Tenant', sub: 'Nguyen Thanh Son (Rm 101)' },
+  SUPER_ADMIN: { email: 'admin@homtel.vn', password: 'Admin@123', label: 'Super Admin', sub: 'Global Platform Control' },
+  OWNER: { email: 'owner@homtel.vn', password: 'Owner@123', label: 'Property Owner', sub: 'Green Living Real Estate' },
+  PROVIDER: { email: 'provider@homtel.vn', password: 'Provider@123', label: 'Service Provider', sub: 'CleanMaster Pro Services' },
+  STAFF: { email: 'staff@homtel.vn', password: 'Staff@123', label: 'Property Staff', sub: 'Lê Văn Kỹ Thuật' },
+  TENANT: { email: 'tenant@homtel.vn', password: 'Tenant@123', label: 'Active Tenant', sub: 'Nguyễn Văn Cư Dân (Phòng 101)' },
   GUEST: { email: '', password: '', label: 'Public Guest', sub: 'Browse & Apply' },
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('property_token'));
+  const [token, setToken] = useState<string | null>(() => typeof window !== 'undefined' ? localStorage.getItem('property_token') : null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
@@ -118,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         token,
         isLoading,
+        loading: isLoading,
         activeCompanyId,
         setActiveCompanyId,
         login,

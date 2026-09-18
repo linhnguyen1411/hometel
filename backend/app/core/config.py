@@ -18,12 +18,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120  # 2 hours
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    VIETQR_WEBHOOK_SECRET: str = "vqr_secret_homtel_dev_2026"
     
-    # Database Configuration (PostgreSQL with asyncpg fallback or SQLite for local dev test)
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/homtel_db"
-    # Local fallback option when PostgreSQL is not yet running
-    SQLITE_FALLBACK_URL: str = "sqlite+aiosqlite:///./data/homtel_dev.db"
-    USE_SQLITE_FALLBACK: bool = False
+    # Feature Flags (Disabled pending corporate entity establishment)
+    PAYMENT_GATEWAY_ENABLED: bool = False
+    ZALO_ENABLED: bool = False
+    
+    # Database Configuration (Strictly PostgreSQL with asyncpg)
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/homtel_db"
 
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -33,6 +35,23 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
         "https://homtel.vn",
     ]
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str, info) -> str:
+        # In production environment, enforce non-default secret key
+        env = info.data.get("ENVIRONMENT", "development") if hasattr(info, "data") else "development"
+        if env == "production" and v == "homtel-super-secure-production-jwt-secret-key-2026-danang":
+            raise ValueError("Production SECRET_KEY must be securely injected via environment variable!")
+        return v
+
+    @field_validator("VIETQR_WEBHOOK_SECRET")
+    @classmethod
+    def validate_webhook_secret(cls, v: str, info) -> str:
+        env = info.data.get("ENVIRONMENT", "development") if hasattr(info, "data") else "development"
+        if env == "production" and (v == "vqr_secret_homtel_dev_2026" or not v or len(v) < 16):
+            raise ValueError("Production VIETQR_WEBHOOK_SECRET must be securely injected via environment variable (min 16 chars)!")
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",

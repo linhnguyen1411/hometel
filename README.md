@@ -1,186 +1,108 @@
 # Homtel - Nền Tảng Quản Lý Căn Hộ Dịch Vụ & Bất Động Sản Cho Thuê
 
-Homtel là nền tảng quản trị và vận hành bất động sản cho thuê toàn diện (Full-Stack), tích hợp cổng thông tin đa vai trò (Super Admin, Chủ nhà / Đơn vị quản lý, Đối tác dịch vụ kỹ thuật, và Cư dân thuê phòng). Ứng dụng hỗ trợ giao diện song ngữ Tiếng Việt & Tiếng Anh với thiết kế chuẩn mực, hiện đại.
+Homtel là nền tảng quản trị và vận hành bất động sản cho thuê toàn diện (Full-Stack), tích hợp cổng thông tin 5 vai trò (Super Admin, Chủ nhà / Đơn vị quản lý, Nhân viên vận hành, Đối tác dịch vụ kỹ thuật, và Cư dân thuê phòng). Ứng dụng hỗ trợ giao diện song ngữ Tiếng Việt & Tiếng Anh với thiết kế chuẩn mực, hiện đại, tối ưu SEO và Mobile-First.
 
 ---
 
 ## 🛠️ Công Nghệ Sử Dụng
 
-- **Backend**: Node.js & Express.js, tích hợp cơ sở dữ liệu SQLite hiệu năng cao qua module gốc `node:sqlite` (`DatabaseSync`) với chế độ WAL (Write-Ahead Logging) và kiểm soát giao dịch nguyên tử (ACID Transactions).
-- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Motion (Framer Motion), Lucide React.
-- **Bundler & Dev Server**: Vite 6 tích hợp trực tiếp làm Middleware trong Express.
-- **Xác thực & Phân quyền**: JWT (JSON Web Tokens), Bcrypt mã hóa mật khẩu, RBAC đa tầng.
+- **Backend**: **Python 3.12+** với **FastAPI** (Async API), **PostgreSQL 18** (kết nối trực tiếp qua `asyncpg`), **SQLAlchemy 2.0 (Async Engine)**, **Alembic** (Database Migrations), **Pydantic v2**.
+- **Frontend**: **Next.js 16 (App Router)**, React 19, Tailwind CSS v4, Lucide React, Turbopack.
+- **Xác thực & Phân quyền**: JWT (JSON Web Tokens), Bcrypt mã hóa mật khẩu an toàn, RBAC 5 vai trò, cơ chế Data Masking bảo vệ PII cư dân.
+- **Tối ưu SEO**: Server-Side Rendering (SSR), Schema.org JSON-LD (`ApartmentComplex`, `HotelRoom`, `LodgingBusiness`), dynamic `/sitemap.xml`, `/robots.txt`, Web App Manifest.
 
 ---
 
 ## 📋 Yêu Cầu Môi Trường (Prerequisites)
 
-Trước khi bắt đầu cài đặt, đảm bảo máy tính của bạn đã cài đặt:
-
-1. **Node.js**: Phiên bản **>= 22.5.0** *(Bắt buộc vì hệ thống sử dụng module SQLite đồng bộ gốc `node:sqlite` có sẵn từ Node v22.5+)*.
-   - Kiểm tra phiên bản hiện tại:
-     ```bash
-     node -v
-     ```
-   - Nếu phiên bản thấp hơn, bạn có thể tải bản mới nhất tại [nodejs.org](https://nodejs.org) hoặc sử dụng `nvm`:
-     ```bash
-     nvm install 22
-     nvm use 22
-     ```
-2. **Package Manager**: `npm` (đi kèm Node.js) hoặc `yarn`, `pnpm`, `bun`.
-3. **Git**: Dùng để quản lý và clone mã nguồn.
+1. **Python**: Phiên bản **>= 3.12** cùng trình quản lý gói `uv`.
+2. **PostgreSQL**: Phiên bản **>= 16** (đang chạy trên cổng 5432, database `homtel_db`).
+3. **Node.js**: Phiên bản **>= 20.0.0** và `pnpm`.
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Chạy Local Từng Bước
+## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy Local
 
-### Bước 1: Mở thư mục dự án
-Mở terminal tại thư mục chứa mã nguồn của dự án:
+### 1. Khởi chạy Cơ sở dữ liệu & Backend (FastAPI)
 ```bash
-cd <duong-dan-den-thu-muc-du-an>
-```
+cd backend
 
-### Bước 2: Cài đặt các gói phụ thuộc (Dependencies)
-Chạy lệnh sau để cài đặt toàn bộ thư viện cần thiết:
+# Cài đặt thư viện bằng uv
+uv sync
+
+# Chạy migrations Alembic trên PostgreSQL
+uv run alembic upgrade head
+
+# Nạp dữ liệu mẫu ban đầu (Seed Data)
+uv run python -m app.seed
+
+# Khởi động Backend API
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+- API Docs tương tác: **[http://127.0.0.1:8000/api/v1/docs](http://127.0.0.1:8000/api/v1/docs)**
+- Healthcheck: **[http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)**
+
+### 2. Khởi chạy Frontend (Next.js)
 ```bash
-npm install
-```
+# Tại thư mục gốc homtel
+pnpm install
 
-### Bước 3: Cấu hình biến môi trường
-Tạo file `.env` từ file mẫu `.env.example`:
+# Khởi chạy server Next.js (Turbopack)
+pnpm dev
+```
+- Trang chủ: **[http://localhost:3000](http://localhost:3000)**
+- Sitemap SEO: **[http://localhost:3000/sitemap.xml](http://localhost:3000/sitemap.xml)**
+- Robots SEO: **[http://localhost:3000/robots.txt](http://localhost:3000/robots.txt)**
+
+### 3. Chạy Kiểm Thử Tự Động (Automated Tests)
 ```bash
-cp .env.example .env
-```
-
-Nội dung file `.env` tham khảo:
-```env
-# JWT Secret dùng để ký và xác thực token đăng nhập
-JWT_SECRET="rental-system-super-secure-jwt-secret-key-2026"
-
-# URL của ứng dụng khi chạy local
-APP_URL="http://localhost:3000"
-
-# (Tùy chọn) Khóa Gemini API nếu sử dụng các tính năng trợ lý AI
-GEMINI_API_KEY=""
-```
-
-### Bước 4: Khởi tạo dữ liệu mẫu (Seed Data)
-Hệ thống đi kèm bộ dữ liệu mẫu phong phú (các tòa nhà, căn hộ, chủ nhà, đối tác dịch vụ, hợp đồng, chỉ số điện nước, hóa đơn và cư dân). 
-
-Khởi tạo cơ sở dữ liệu SQLite (`data/rental.db`) và nạp dữ liệu bằng lệnh:
-```bash
-npm run seed
-```
-*(Lưu ý: Khi khởi động server lần đầu, nếu cơ sở dữ liệu chưa có dữ liệu, server cũng sẽ tự động thực hiện nạp dữ liệu ban đầu).*
-
----
-
-## 💻 Khởi Chạy Ứng Dụng
-
-### 1. Chế độ Phát triển (Development Mode)
-Chạy cả backend Express và frontend Vite trên cùng một tiến trình:
-```bash
-npm run dev
-```
-
-- Mở trình duyệt và truy cập: **[http://localhost:3000](http://localhost:3000)**
-- Tài liệu API Swagger / OpenAPI tương tác: **[http://localhost:3000/api/docs](http://localhost:3000/api/docs)**
-- Kiểm tra trạng thái máy chủ (Healthcheck): **[http://localhost:3000/api/health](http://localhost:3000/api/health)**
-
-### 2. Kiểm tra lỗi kiểu dữ liệu (Type-check / Lint)
-Để kiểm tra tính hợp lệ của toàn bộ mã nguồn TypeScript:
-```bash
-npm run lint
-```
-
-### 3. Chạy kiểm thử tự động (Automated Tests)
-Hệ thống có sẵn các bài kiểm thử tích hợp (Integration Tests) cho luồng xác thực, hóa đơn và hợp đồng:
-```bash
-npm run test
-```
-
-### 4. Đóng gói và Chạy Bản Production (Production Build)
-Để xây dựng bản phân phối tối ưu cho môi trường triển khai thực tế:
-```bash
-# Biên dịch Frontend (Vite) và Backend Bundle (esbuild)
-npm run build
-
-# Khởi chạy server production
-npm run start
+cd backend
+uv run python -m pytest tests/ -v
 ```
 
 ---
 
 ## 🔑 Tài Khoản Thử Nghiệm (Demo Accounts)
 
-Hệ thống cung cấp sẵn thanh **Live Role Simulator** ở thanh đầu trang giúp bạn chuyển đổi nhanh giữa các vai trò mà không cần đăng xuất. Bạn cũng có thể đăng nhập thủ công bằng các tài khoản sau:
-
 | Vai trò | Email đăng nhập | Mật khẩu | Mô tả quyền hạn |
 | :--- | :--- | :--- | :--- |
-| **Super Admin** | `admin@propertyv1.com` | `Admin@123` | Quản trị toàn hệ thống, cấp phép chủ nhà, nhật ký kiểm toán. |
-| **Chủ nhà (Owner 1)** | `owner1@greenliving.com` | `Owner@123` | Quản lý tòa Green Living, chốt số điện nước, duyệt hồ sơ. |
-| **Chủ nhà (Owner 2)** | `owner2@skyline.com` | `Owner@123` | Quản lý căn hộ tòa Skyline Urban Residences. |
-| **Chủ nhà (Owner 3)** | `owner3@sunset.com` | `Owner@123` | Quản lý chuỗi nhà trọ hộ kinh doanh Sunset Homes. |
-| **Đối tác (Dịch vụ)** | `cleanmaster@clean.com` | `Provider@123` | CleanMaster Pro: Điều phối thợ dọn dẹp, bảo trì, báo giá. |
-| **Nhân viên (Staff)** | `staff1@greenliving.com` | `Staff@123` | Quản lý vận hành tòa nhà trực thuộc Green Living. |
-| **Cư dân (Tenant)** | `tenant1@gmail.com` | `Tenant@123` | Cổng cư dân `/my`, thanh toán tiền phòng, báo hỏng hóc. |
-| **Cư dân (Tenant khác)** | `tenant2@gmail.com` đến `tenant24@gmail.com` | `Tenant@123` | Danh sách các khách thuê với các trạng thái hợp đồng khác nhau. |
+| **Super Admin** | `admin@homtel.vn` | `Admin@123` | Quản trị tối cao, thống kê toàn sàn, cấp phép chủ nhà. |
+| **Chủ nhà (Owner)** | `owner@homtel.vn` | `Owner@123` | Quản trị tòa nhà, phòng, biểu phí, duyệt hợp đồng, tài chính P&L. |
+| **Nhân viên (Staff)** | `staff@homtel.vn` | `Staff@123` | Vận hành tòa nhà, kiểm tra phòng, hỗ trợ cư dân. |
+| **Đối tác (Provider)** | `provider@homtel.vn` | `Provider@123` | Nhận phiếu công tác dịch vụ (Smart Work Order), xem đánh giá uy tín. |
+| **Cư dân (Tenant)** | `tenant@homtel.vn` | `Tenant@123` | Cổng cư dân `/my`, thanh toán hóa đơn VietQR, đặt dịch vụ phòng. |
 
 ---
 
 ## 📁 Cấu Trúc Thư Mục Dự Án
 
 ```
-├── data/                    # Thư mục chứa tệp cơ sở dữ liệu SQLite (rental.db)
-├── public/                  # Tài nguyên tĩnh (Favicon, hình ảnh, tài liệu)
-├── server/                  # Mã nguồn Backend (Express.js)
-│   ├── db/                  # Kết nối SQLite (node:sqlite) & Schema SQL
-│   ├── middlewares/         # Middleware bảo mật, xác thực JWT, RBAC
-│   ├── routes/              # Các Endpoint REST API (/api/v1/...)
-│   └── seed.ts              # Script nạp dữ liệu mẫu Idempotent
-├── src/                     # Mã nguồn Frontend (React 19 + TypeScript)
-│   ├── components/
-│   │   ├── admin/           # Giao diện Cổng Quản trị Tối cao (Super Admin)
-│   │   ├── auth/            # Hộp thoại Đăng nhập / Đăng ký tài khoản
-│   │   ├── owner/           # Giao diện Cổng Chủ nhà / Đơn vị cho thuê
-│   │   ├── provider/        # Giao diện Cổng Đối tác dịch vụ kỹ thuật
-│   │   ├── public/          # Trang chủ công khai, bộ lọc phòng, chi tiết phòng
-│   │   └── tenant/          # Giao diện Cổng Cư dân (/my), thanh toán & dịch vụ
-│   ├── context/             # React Context (LanguageContext, AuthContext)
-│   ├── i18n/                # Bộ từ điển song ngữ (Tiếng Việt / English)
-│   ├── App.tsx              # Component trung tâm và điều hướng giao diện
-│   └── main.tsx             # Điểm vào chính của ứng dụng
-├── tests/                   # Kịch bản kiểm thử API tự động
-├── server.ts                # File khởi chạy máy chủ tích hợp Express & Vite
-├── vite.config.ts           # Cấu hình Vite & Tailwind CSS
-├── tsconfig.json            # Cấu hình TypeScript
-└── package.json             # Danh sách dependencies và npm scripts
+├── backend/                 # Backend Python FastAPI + PostgreSQL
+│   ├── alembic/             # Lịch sử và kịch bản Alembic migrations
+│   ├── app/
+│   │   ├── common/          # Envelope chuẩn hóa response/error
+│   │   ├── core/            # Config, bảo mật JWT, kết nối PostgreSQL
+│   │   ├── modules/         # 10 modules nghiệp vụ (auth, properties, billing, ...)
+│   │   └── seed.py          # Script nạp dữ liệu mẫu
+│   └── tests/               # Pytest suite tự động
+├── src/                     # Frontend Next.js 16 (App Router)
+│   ├── app/                 # Các tuyến URL: /, /explore, /buildings/[slug], /my, ...
+│   ├── components/          # Components theo vai trò và layout
+│   ├── context/             # AuthContext, LanguageContext
+│   ├── services/            # Client API kết nối FastAPI qua proxy Next.js
+│   └── types/               # Type definitions TypeScript
+├── public/                  # Static assets, PWA icons
+└── next.config.mjs          # Cấu hình Next.js và API Rewrites
 ```
 
 ---
 
-## ❓ Xử Lý Sự Cố Thường Gặp (Troubleshooting)
+## ⚙️ Cờ Tính Năng (Feature Flags)
 
-### 1. Lỗi `Cannot find module 'node:sqlite'` hoặc `DatabaseSync is not a constructor`
-- **Nguyên nhân**: Bạn đang chạy Node.js phiên bản cũ (dưới v22.5.0).
-- **Cách khắc phục**: Nâng cấp Node.js lên phiên bản **22.5.0** trở lên bằng `nvm use 22` hoặc cài lại từ trang chủ Node.js.
+Để đảm bảo tuân thủ pháp lý khi chưa hoàn tất thành lập doanh nghiệp, các cổng tích hợp bên thứ ba được kiểm soát bằng biến môi trường và mặc định tắt:
 
-### 2. Lỗi cổng `Port 3000 is already in use` (`EADDRINUSE`)
-- **Nguyên nhân**: Đang có ứng dụng khác chiếm dụng cổng 3000.
-- **Cách khắc phục**:
-  - Trên macOS / Linux:
-    ```bash
-    lsof -i :3000
-    kill -9 <PID>
-    ```
-  - Trên Windows (PowerShell):
-    ```powershell
-    Get-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess | Stop-Process
-    ```
+| Tính năng | Backend Flag (`backend/.env`) | Frontend Flag (`.env`) | Trạng thái | Điều kiện kích hoạt lại |
+| :--- | :--- | :--- | :--- | :--- |
+| **Cổng VietQR NAPAS 247** | `PAYMENT_GATEWAY_ENABLED=False` | `NEXT_PUBLIC_PAYMENT_GATEWAY_ENABLED=false` | **TẮT** (API trả 503, UI chuyển về thanh toán chuyển khoản thủ công) | Đăng ký pháp nhân doanh nghiệp với ngân hàng/cổng thanh toán |
+| **Zalo ZNS Thông Báo** | `ZALO_ENABLED=False` | `NEXT_PUBLIC_ZALO_ENABLED=false` | **TẮT** (API trả 503, UI chuyển sang SMS/Mã xác thực) | Hoàn tất xác thực Zalo Official Account (Zalo OA) doanh nghiệp |
 
-### 3. Cần làm mới (Reset) lại toàn bộ dữ liệu cơ sở dữ liệu
-- Nếu bạn muốn đưa hệ thống về trạng thái ban đầu:
-  1. Dừng server (`Ctrl + C`).
-  2. Xóa file database: `rm data/rental.db data/rental.db-wal data/rental.db-shm` (hoặc xóa trong thư mục `data`).
-  3. Chạy lại lệnh seed: `npm run seed`.
-  4. Chạy lại server: `npm run dev`.

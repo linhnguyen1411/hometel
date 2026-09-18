@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, Optional, Any, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 T = TypeVar("T")
 
@@ -22,4 +22,5 @@ class ApiResponse(BaseModel, Generic[T]):
     data: Optional[T] = None
     meta: Optional[PaginationMeta] = None
     error: Optional[ErrorDetail] = None
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import { X, PenTool, KeyRound, ShieldCheck, Check, RotateCcw, AlertCircle } from 'lucide-react';
 
 interface ContractSigningModalProps {
@@ -104,11 +104,13 @@ export const ContractSigningModal: React.FC<ContractSigningModalProps> = ({
     setHasDrawn(false);
   };
 
+  const isZaloEnabled = process.env.NEXT_PUBLIC_ZALO_ENABLED === 'true';
+
   const handleSendOtp = async () => {
     setSendingOtp(true);
     setError(null);
     try {
-      const res = await api.sendContractOtp(contract.id, 'ZALO');
+      const res = await api.sendContractOtp(contract.id, isZaloEnabled ? 'ZALO' : 'SMS');
       setOtpSent(true);
       setOtpCountdown(60);
       if (res.otpCode) {
@@ -298,7 +300,9 @@ export const ContractSigningModal: React.FC<ContractSigningModalProps> = ({
               /* Method 2: OTP Verification */
               <div className="space-y-3 p-4 bg-blue-50/60 rounded-xl border border-blue-100">
                 <p className="text-slate-600 leading-relaxed">
-                  {t('contract.otp_desc', 'Mã xác thực bảo mật một lần (OTP) 6 chữ số sẽ được gửi qua Zalo Notification Service / SMS đến số điện thoại của bạn.')}
+                  {isZaloEnabled
+                    ? t('contract.otp_desc', 'Mã xác thực bảo mật một lần (OTP) 6 chữ số sẽ được gửi qua Zalo Notification Service / SMS đến số điện thoại của bạn.')
+                    : 'Mã xác thực bảo mật một lần (OTP) 6 chữ số sẽ được gửi qua SMS đến số điện thoại của bạn.'}
                 </p>
 
                 <div className="flex items-center gap-2">

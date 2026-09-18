@@ -1,51 +1,94 @@
 # BÁO CÁO QUYẾT ĐỊNH KIẾN TRÚC (ARCHITECTURE DECISION RECORD - ADR)
 
-**Ngày ban hành**: 16/09/2026  
-**Trạng thái**: ĐÃ DUYỆT (ACCEPTED)  
-**Quyết định**: Giữ nguyên `server/` (Node.js/Express) làm Nguồn Sự Thật Duy Nhất (Single Source of Truth). Đóng băng phát triển tại `backend/` (FastAPI).
+**Ngày cập nhật**: 16/09/2026  
+**Trạng thái**: ĐÃ DUYỆT (SUPERSEDED & RE-ARCHITECTED)  
+**Quyết định chính thức**: Hợp nhất và chuẩn hóa toàn bộ nền tảng sang **FastAPI (Python 3.12+) + PostgreSQL 18 + SQLAlchemy 2.0 Async + Next.js 16 (App Router)**. **Xóa vĩnh viễn `server/` (Express + SQLite) và các tệp dữ liệu SQLite mồ côi**.
 
 ---
 
-## 1. BỐI CẢNH (CONTEXT)
-Trong quá trình thử nghiệm thiết kế, repo tồn tại song song hai thư mục backend:
-1. `server/` — Viết bằng **Node.js/Express + TypeScript + node:sqlite (WAL) + JWT/bcrypt**. Đã triển khai đầy đủ 10 route modules (`auth`, `superAdmin`, `company`, `building`, `rental`, `billing`, `service`, `notification`, `operations`, `docs`), các service nghiệp vụ và repository layer. Đây là backend phục vụ toàn bộ tính năng thực tế cho frontend React 19.
-2. `backend/` — Viết bằng **FastAPI + SQLAlchemy async + PostgreSQL/Alembic**, mới chỉ có 3 modules ở mức cơ bản (`auth`, `properties`, `operations`).
+## 1. BỐI CẢNH VÀ LÝ DO PIVOT (CONTEXT & RATIONALE)
 
-Việc duy trì hai backend song song gây ra rủi ro phân mảnh mã nguồn, trùng lặp công sức và tiềm ẩn xung đột logic nghiệp vụ.
+Ban đầu dự án thử nghiệm song song hai backend: `server/` (Node/Express/SQLite) và `backend/` (FastAPI). Sau khi xem xét toàn diện các yêu cầu nghiệp vụ thực tế của một hệ thống Quản lý Bất động sản và Vận hành Tòa nhà Cho thuê (Homtel Platform) phục vụ 5 vai trò (Super Admin, Chủ nhà, Nhân viên, Đối tác, Cư dân), ban kiến trúc đã quyết định thực hiện bước chuyển đổi mang tính quyết định (Pivot):
 
----
-
-## 2. QUYẾT ĐỊNH KIẾN TRÚC (DECISION)
-1. **Nguồn sự thật duy nhất (Single Source of Truth)**:
-   - Toàn bộ tính năng từ **Phase 1 trở đi sẽ chỉ được phát triển, sửa lỗi và kiểm thử trên `server/` (Express + TypeScript)**.
-   - Tuyệt đối không viết cùng một tính năng vào cả hai backend.
-2. **Định vị thư mục `backend/` (FastAPI)**:
-   - Dừng toàn bộ việc phát triển tính năng mới trên `backend/`.
-   - Giữ nguyên `backend/` trong repo như tài liệu thiết kế tham khảo kỹ thuật (Reference Architecture) cho việc migrate cơ sở dữ liệu sang PostgreSQL (Postgres schema, 3NF models) khi hệ thống đạt quy mô cần tách microservices. Không xóa file ngay.
+1. **Yêu cầu SEO & Khả năng hiển thị công khai (Public Discoverability)**:
+   - Nền tảng cần tiếp cận khách thuê qua các công cụ tìm kiếm (Google, Bing). Khách hàng tìm kiếm căn hộ tại Đà Nẵng cần các trang chi tiết tòa nhà, phòng có đầy đủ **Server-Side Rendering (SSR)**, thẻ OpenGraph, sitemap động, robots.txt và dữ liệu có cấu trúc **Schema.org JSON-LD** (`ApartmentComplex`, `HotelRoom`, `LodgingBusiness`).
+   - Kiến trúc cũ (Vite React SPA thuần) phụ thuộc render ở client, gây bất lợi lớn cho SEO. Frontend đã được nâng cấp toàn diện sang **Next.js 16 App Router** với Turbopack.
+2. **Tính toàn vẹn dữ liệu doanh nghiệp (Enterprise Relational Integrity)**:
+   - Hệ thống vận hành tài chính, chỉ số công tơ, hóa đơn hàng tháng, hợp đồng điện tử và nhiều công ty (multi-tenancy) đòi hỏi cơ sở dữ liệu quan hệ mạnh mẽ, giao dịch ACID nghiêm ngặt, cơ chế migration chuẩn mực (`Alembic`) và kết nối bất đồng bộ hiệu năng cao (`asyncpg`).
+   - SQLite cũ (`data/rental.db`) chỉ phù hợp prototype cục bộ, tiềm ẩn xung đột khóa ghi (database lock) khi vận hành đa luồng và không đảm bảo khả năng mở rộng.
+3. **Loại bỏ phân mảnh mã nguồn (Single Source of Truth)**:
+   - Quyết định trước đây (ADR cũ) từng giữ tạm `server/` do lo ngại chi phí chuyển đổi. Tuy nhiên, việc duy trì hai backend gây rủi ro kỹ thuật cực lớn. Do đó, toàn bộ nghiệp vụ 10 module đã được chuyển đổi hoàn chỉnh sang `backend/` (FastAPI), sau đó **xóa vĩnh viễn thư mục `server/` và file `server.ts`** để loại bỏ hoàn toàn mã thừa.
 
 ---
 
-## 3. KẾT QUẢ VÀ HÀNH ĐỘNG (CONSEQUENCES)
-- Mọi API endpoint, WebSocket, tích hợp ngân hàng (VietQR/Webhook), Zalo ZNS/OA, và hợp đồng điện tử sẽ tập trung 100% trong `server/`.
-- Mọi truy vấn cơ sở dữ liệu trong `server/` sẽ được chuẩn hóa đi qua `server/db/repositories/*` (Repository Pattern). Khi đổi từ SQLite WAL sang PostgreSQL trong tương lai, chỉ cần thay thế driver DB trong repository mà không phải thay đổi business logic ở controller và service.
+## 2. QUYẾT ĐỊNH KIẾN TRÚC CHI TIẾT (ARCHITECTURE SPECIFICATIONS)
+
+### A. Backend: Python FastAPI Async (`backend/`)
+- **Ngôn ngữ & Runtime**: Python 3.12+, quản lý gói qua `uv`.
+- **Framework**: FastAPI (Async API), Pydantic v2 (Data Validation & Schemas).
+- **Cơ sở dữ liệu**: **PostgreSQL 18** (kết nối trực tiếp qua `postgresql+asyncpg://`, cổng 5432).
+  - *Quy định nghiêm ngặt*: Loại bỏ hoàn toàn SQLite fallback trong môi trường phát triển lẫn sản xuất.
+  - *Quản lý lược đồ*: **Alembic** phiên bản async thực thi migration (`alembic upgrade head`).
+- **Bảo mật & Phân quyền**:
+  - Hashing mật khẩu bằng `bcrypt` trực tiếp (chống lỗi tràn chuỗi 72 bytes của passlib).
+  - JWT tokens với hạn dùng tính toán bằng thời gian chuẩn UTC có timezone (`datetime.now(timezone.utc)`).
+  - Phân quyền RBAC chặt chẽ cho 5 vai trò: `SUPER_ADMIN`, `OWNER`, `STAFF`, `PROVIDER`, `TENANT`.
+  - **Bảo vệ PII & Giá thuê (Privacy-First)**: Endpoint Building 360 (`/operations/buildings/{id}/360`) và Room 360 (`/operations/rooms/{id}/360`) tự động che giấu thông tin cư dân và giá thuê đối với người gọi ẩn danh, đối tác dịch vụ hoặc cư dân phòng khác; chỉ hiển thị dữ liệu đầy đủ cho cấp quản lý (`OWNER`, `STAFF`, `SUPER_ADMIN`) hoặc chính cư dân sở hữu hợp đồng.
+  - **Xác thực Webhook tài chính (VietQR)**: Endpoint `/billing/invoices/webhook/vietqr` bắt buộc xác thực khóa bí mật qua header `X-Webhook-Secret`, ghi log cảnh báo an ninh cho các truy cập trái phép.
+
+### B. Frontend: Next.js 16 App Router (`src/app/`)
+- **Công nghệ**: Next.js 16, React 19, Tailwind CSS v4, Turbopack.
+- **Chuyển trang chuẩn URL (URL-based Navigation)**: Chuyển trang thực qua router Next.js (`/`, `/explore`, `/buildings/[slug]`, `/rooms/[id]`, `/services`, `/owner`, `/my`, `/provider`, `/admin`), không sử dụng state giả lập trong RAM.
+- **Tối ưu hóa SEO**:
+  - SSR cho toàn bộ trang công khai (`/`, `/explore`, `/buildings/[slug]`, `/rooms/[id]`, `/services`).
+  - Chèn tự động Schema.org JSON-LD (`Organization`, `LodgingBusiness`, `ApartmentComplex`, `HotelRoom`).
+  - Sinh động sitemap (`/sitemap.xml`), robots (`/robots.txt`), và PWA manifest (`/manifest.webmanifest`).
+- **Trải nghiệm Mobile-first**:
+  - Thanh điều hướng đáy màn hình (`MobileNav.tsx`) cố định chuẩn ứng dụng native.
+  - Khung tìm kiếm, lưới hiển thị responsive linh hoạt.
 
 ---
 
-## 4. KẾT QUẢ AUDIT PHÂN QUYỀN RBAC (AUTH ROUTE AUDIT)
+## 3. TÌNH TRẠNG CÁC TÀI NGUYÊN BỊ LOẠI BỎ (DECOMMISSIONED ASSETS)
 
-Đã hoàn thành rà soát toàn bộ các route trong `server/routes/*.ts`:
-- `superAdminRoutes.ts`: Toàn bộ route đều được khóa bằng `authenticate` và `requireRole('SUPER_ADMIN')`.
-- `billingRoutes.ts`:
-  - Đã bổ sung `requireRole('OWNER', 'STAFF', 'SUPER_ADMIN')` và `verifyCompanyAccess` vào `meterRouter.post('/readings')` để ngăn ngừa Tenant hoặc người ngoài ghi đè chỉ số công tơ.
-  - Đã kiểm tra quyền sở hữu phòng đối với `meterRouter.get('/room/:roomId')`.
-  - Đã bổ sung kiểm tra vai trò cho `invoiceRouter.post('/generate')`.
-- `buildingRoutes.ts`:
-  - Bổ sung `requireRole('OWNER', 'SUPER_ADMIN')` khi tạo tòa nhà mới và cấu hình biểu phí.
-  - Bổ sung `requireRole('OWNER', 'STAFF', 'SUPER_ADMIN')` khi tạo và chỉnh sửa phòng.
-- `rentalRoutes.ts`:
-  - Bổ sung `requireRole('OWNER', 'STAFF', 'SUPER_ADMIN')` cho việc duyệt đơn thuê (`/applications/:id/review`) và tạo hợp đồng trực tiếp (`/contracts`).
-- `serviceRoutes.ts`:
-  - Bổ sung `requireRole('PROVIDER', 'SUPER_ADMIN')` khi tạo dịch vụ mới.
-  - Bổ sung `requireRole('PROVIDER', 'STAFF', 'SUPER_ADMIN')` khi duyệt yêu cầu và phân công kỹ thuật viên.
-- `operationsRoutes.ts`:
-  - Bổ sung `requireRole('OWNER', 'STAFF', 'SUPER_ADMIN')` cho các endpoint Cockpit, Action Center, Quick Actions và AI Insights để ngăn lộ dữ liệu vận hành cho người ngoài.
+| Tài nguyên | Trạng thái | Ghi chú |
+| :--- | :--- | :--- |
+| `server/` (Express codebase) | **ĐÃ XÓA VĨNH VIỄN** | Toàn bộ tính năng đã được tái hiện trong `backend/` |
+| `server.ts` | **ĐÃ XÓA VĨNH VIỄN** | Thay thế bằng `next.config.mjs` API rewrites |
+| `data/rental.db*` (SQLite cũ) | **ĐÃ XÓA VĨNH VIỄN** | Đã chuyển sang PostgreSQL 18 (`homtel_db`) |
+| `backend/data/homtel_dev.db*` | **ĐÃ XÓA VĨNH VIỄN** | Không còn sử dụng SQLite fallback |
+
+---
+
+## 4. MA TRẬN BẢO MẬT & PHÂN QUYỀN (ACCESS CONTROL MATRIX)
+
+| Module / Endpoint | Quyền hạn truy cập | Cơ chế bảo vệ & Che giấu dữ liệu |
+| :--- | :--- | :--- |
+| `POST /auth/login`, `POST /auth/register` | Public | Rate limit, bcrypt verification |
+| `GET /auth/me` | Mọi user đã đăng nhập | JWT Bearer Authentication |
+| `GET /buildings`, `GET /rooms` | Public | Danh mục niêm yết công khai phục vụ SEO |
+| `GET /operations/buildings/{id}/360` | Phân cấp theo vai trò | Anonymous/Provider: Chỉ xem summary; Tenant: Xem phòng mình, mask phòng khác; Owner/Staff/Admin: Xem đầy đủ |
+| `GET /operations/rooms/{id}/360` | Phân cấp theo vai trò | Chỉ Owner/Staff/Admin hoặc Tenant chính chủ mới xem được hợp đồng, hóa đơn, PII cư dân |
+| `POST /billing/invoices/webhook/vietqr` | Cổng thanh toán (SePay/Casso/Bank) | Bắt buộc `X-Webhook-Secret`, từ chối 401 nếu thiếu/sai secret |
+| `POST /buildings`, `POST /rooms` | OWNER, SUPER_ADMIN | `require_role` middleware (403 nếu sai vai trò) |
+| `GET /admin/*` | SUPER_ADMIN | `require_role("SUPER_ADMIN")` (403 cho tất cả vai trò khác) |
+
+---
+
+## 5. TÍNH NĂNG CHỜ ĐĂNG KÝ PHÁP NHÂN (FEATURE-FLAGGED OFF)
+
+Nhằm đảm bảo tuân thủ pháp lý và tính khả thi trong giai đoạn chưa thành lập pháp nhân doanh nghiệp, hai tính năng tích hợp nhà cung cấp bên thứ ba đã được **hoàn thiện khung mã nguồn nhưng đang tạm tắt qua Feature Flags**:
+
+1. **Cổng thanh toán VietQR / NAPAS 247 & Webhook ngân hàng**:
+   - **Cờ cấu hình**: `PAYMENT_GATEWAY_ENABLED=False` (backend), `NEXT_PUBLIC_PAYMENT_GATEWAY_ENABLED=false` (frontend).
+   - **Hành vi**:
+     - Endpoint `GET /billing/invoices/{id}/vietqr` và `POST /billing/invoices/webhook/vietqr` trả về **HTTP 503 Service Unavailable** kèm thông báo `"Tính năng đang tạm ngưng, sẽ kích hoạt sau khi hoàn tất đăng ký doanh nghiệp"`.
+     - Giao diện `PaymentModal`: Ẩn hoàn toàn mã QR VietQR và tab QR; hiển thị thông tin tài khoản ngân hàng của tòa nhà và kích hoạt luồng xác nhận chuyển khoản thủ công (`POST /billing/payments`).
+   - **Điều kiện bật lại**: Khi thành lập doanh nghiệp và ký hợp đồng mở cổng thanh toán (SePay/Casso/PayOS/Ngân hàng), đổi cờ thành `True`.
+
+2. **Dịch vụ thông báo Zalo ZNS (Zalo Notification Service)**:
+   - **Cờ cấu hình**: `ZALO_ENABLED=False` (backend), `NEXT_PUBLIC_ZALO_ENABLED=false` (frontend).
+   - **Hành vi**:
+     - Endpoint `POST /notifications/send-zalo` trả về **HTTP 503 Service Unavailable**.
+     - Giao diện ký hợp đồng `ContractSigningModal` chuyển sang phương thức gửi mã xác thực SMS/hệ thống, ẩn tùy chọn Zalo.
+   - **Điều kiện bật lại**: Khi hoàn tất xác thực Zalo Official Account (Zalo OA) doanh nghiệp, đổi cờ thành `True`.

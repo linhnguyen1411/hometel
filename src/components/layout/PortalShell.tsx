@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { api } from '../../services/api.js';
-import { LanguageSelector } from '../LanguageSelector.js';
-import { NotificationsModal } from '../NotificationsModal.js';
+﻿import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { api } from '../../services/api';
+import { LanguageSelector } from '../LanguageSelector';
+import { NotificationsModal } from '../NotificationsModal';
 import {
   Building,
   Bell,

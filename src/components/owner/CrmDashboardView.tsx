@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import React, { useState, useEffect } from 'react';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Users,
   Calendar,
@@ -70,9 +70,11 @@ export const CrmDashboardView: React.FC<CrmDashboardViewProps> = ({ onNavigateTa
         api.getCrmTours(''),
         api.getRooms('')
       ]);
-      setData(crmRes);
-      setTours(tourRes);
-      setRooms(roomRes);
+      // API returns plain array; normalise to expected shape
+      const leadsArr: any[] = Array.isArray(crmRes) ? crmRes : (crmRes as any)?.leads ?? [];
+      setData({ leads: leadsArr, funnel: {} });
+      setTours(Array.isArray(tourRes) ? tourRes : []);
+      setRooms(Array.isArray(roomRes) ? roomRes : []);
       if (roomRes.length > 0 && !tourForm.roomId) {
         setTourForm(prev => ({ ...prev, roomId: roomRes[0].id }));
         setConvertForm(prev => ({ ...prev, roomId: roomRes[0].id }));

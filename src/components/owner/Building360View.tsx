@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { Building360Data, Building } from '../../types/index.js';
-import { BuildingFacadeView } from './BuildingFacadeView.js';
-import { BuildingGridView } from './BuildingGridView.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { Building360Data, Building } from '../../types/index';
+import { BuildingFacadeView } from './BuildingFacadeView';
+import { BuildingGridView } from './BuildingGridView';
 import {
   Building2,
   Home,
@@ -114,15 +114,17 @@ export const Building360View: React.FC<Building360ViewProps> = ({
           <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
             <span className="text-slate-400 text-xs font-semibold block">Tỷ lệ lấp đầy</span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black text-slate-900">{data.summary.occupancyRate}%</span>
+              <span className="text-2xl font-black text-blue-600">
+                {data.summary.occupancyRate ?? 0}%
+              </span>
               <span className="text-xs text-slate-500">
-                ({data.summary.occupiedRooms}/{data.summary.totalRooms} căn)
+                ({data.summary.occupiedRooms ?? 0}/{data.summary.totalRooms ?? 0} phòng)
               </span>
             </div>
             <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
               <div
                 className="bg-blue-600 h-full rounded-full transition-all"
-                style={{ width: `${data.summary.occupancyRate}%` }}
+                style={{ width: `${data.summary.occupancyRate ?? 0}%` }}
               />
             </div>
           </div>
@@ -131,10 +133,10 @@ export const Building360View: React.FC<Building360ViewProps> = ({
             <span className="text-slate-400 text-xs font-semibold block">Tiền thu phí tháng</span>
             <div className="mt-1">
               <span className="text-xl font-black text-emerald-600 block">
-                {data.summary.totalCollected.toLocaleString()} VND
+                {(data.summary.totalCollected ?? 0).toLocaleString()} VND
               </span>
               <span className="text-xs text-slate-400">
-                Đã thu {data.summary.collectionRate}% (Nợ: {data.summary.totalOutstanding.toLocaleString()} VND)
+                Đã thu {data.summary.collectionRate ?? 0}% (Nợ: {(data.summary.totalOutstanding ?? 0).toLocaleString()} VND)
               </span>
             </div>
           </div>
@@ -142,13 +144,13 @@ export const Building360View: React.FC<Building360ViewProps> = ({
           <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
             <span className="text-slate-400 text-xs font-semibold block">Phòng có sự cố / Quá hạn</span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className={`text-2xl font-black ${data.summary.criticalRooms > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                {data.summary.criticalRooms}
+              <span className={`text-2xl font-black ${(data.summary.criticalRooms ?? 0) > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                {data.summary.criticalRooms ?? 0}
               </span>
               <span className="text-xs text-slate-500">căn hộ</span>
             </div>
             <span className="text-[11px] text-slate-400 mt-2 block">
-              {data.summary.criticalRooms > 0 ? 'Cần xử lý nhắc nợ hoặc sửa chữa' : 'Toàn bộ phòng bình thường'}
+              {(data.summary.criticalRooms ?? 0) > 0 ? 'Cần xử lý nhắc nợ hoặc sửa chữa' : 'Toàn bộ phòng bình thường'}
             </span>
           </div>
 
@@ -156,7 +158,7 @@ export const Building360View: React.FC<Building360ViewProps> = ({
             <span className="text-slate-400 text-xs font-semibold block">Phiếu bảo trì đang mở</span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-black text-purple-600">
-                {data.summary.openWorkOrdersCount}
+                {data.summary.openWorkOrdersCount ?? 0}
               </span>
               <span className="text-xs text-slate-500">phiếu</span>
             </div>

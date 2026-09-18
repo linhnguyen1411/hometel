@@ -1,6 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { Building, MapPin, Phone, Mail, ShieldCheck, Heart, ExternalLink, Clock, Award, ChevronRight } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const Footer: React.FC = () => {
   const { t } = useLanguage();

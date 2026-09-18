@@ -6,5 +6,30 @@ coverage/
 *.log
 .env*
 !.env.example
+backend/.env*
+!backend/.env.example
 *.zip
 data/*.db*
+*.db
+*.db-journal
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+
+# Python & testing
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+backend/.venv/
+env/
+venv/
+
+

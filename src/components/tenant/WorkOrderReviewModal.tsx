@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Star, X, CheckCircle2, AlertCircle, ThumbsUp, Wrench, ShieldCheck } from 'lucide-react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface WorkOrderReviewModalProps {
   isOpen: boolean;

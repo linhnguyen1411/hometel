@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -90,7 +90,7 @@ class AuthService:
 
         raw_refresh = secrets.token_hex(32)
         token_hash = hashlib.sha256(raw_refresh.encode()).hexdigest()
-        expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
         refresh_record = RefreshToken(
             user_id=user.id,

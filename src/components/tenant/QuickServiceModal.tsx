@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+﻿import React, { useState, useEffect } from 'react';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   X,
   Sparkles,

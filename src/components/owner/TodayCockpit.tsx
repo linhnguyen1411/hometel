@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { TodayCockpitData, ActionItem, AiInsight } from '../../types/index.js';
+﻿import React, { useState, useEffect } from 'react';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { TodayCockpitData, ActionItem, AiInsight } from '../../types/index';
 import {
   AlertCircle,
   Clock,

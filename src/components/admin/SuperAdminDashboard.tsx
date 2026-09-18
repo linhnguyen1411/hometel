@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
-import { PortalShell, PortalMenuItem } from '../layout/PortalShell.js';
+﻿import React, { useState, useEffect } from 'react';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
+import { PortalShell, PortalMenuItem } from '../layout/PortalShell';
 import { Shield, Building, Wrench, Users, DollarSign, Activity, Plus, Search, CheckCircle2, History, AlertCircle, Sparkles } from 'lucide-react';
 
 export const SuperAdminDashboard: React.FC = () => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api } from '../../services/api.js';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { api } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import { Search, Home, Building2, User, FileText, Receipt, Wrench, Shield, ArrowRight, X, Sparkles, Clock, AlertCircle } from 'lucide-react';
 
 interface CommandPaletteProps {
@@ -198,7 +198,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                           Phòng {r.room_number} • {r.building_name}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          {r.base_rent.toLocaleString()} VND/tháng • Trạng thái: {r.status}
+                          {((r as any).baseRent ?? r.base_rent)?.toLocaleString() ?? '—'} VND/tháng • Trạng thái: {r.status}
                         </div>
                       </div>
                     </div>
@@ -309,7 +309,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                           {inv.invoice_number} • Phòng {inv.room_number}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          Kỳ {inv.billing_month} • {inv.total.toLocaleString()} VND • {inv.status}
+                          Kỳ {inv.billing_month || (inv as any).periodMonth || '—'} • {((inv as any).totalAmount ?? inv.total ?? 0).toLocaleString()} VND • {inv.status}
                         </div>
                       </div>
                     </div>

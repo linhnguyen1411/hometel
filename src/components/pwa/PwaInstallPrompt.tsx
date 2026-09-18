@@ -1,6 +1,8 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { Download, WifiOff, Smartphone, X, CheckCircle2 } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext.js';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -16,9 +18,12 @@ export const PwaInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      setIsOffline(!navigator.onLine);
+    }
     // Check if already installed (standalone mode)
     if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
       setIsInstalled(true);

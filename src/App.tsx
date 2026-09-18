@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext.js';
-import { LanguageProvider, useLanguage } from './context/LanguageContext.js';
-import { Header } from './components/Header.js';
-import { Footer } from './components/public/Footer.js';
-import { AuthModal } from './components/auth/AuthModal.js';
-import { PropertyExplorer } from './components/public/PropertyExplorer.js';
-import { ServiceCatalogView } from './components/public/ServiceCatalogView.js';
-import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard.js';
-import { OwnerDashboard } from './components/owner/OwnerDashboard.js';
-import { ProviderDashboard } from './components/provider/ProviderDashboard.js';
-import { TenantDashboard } from './components/tenant/TenantDashboard.js';
+﻿import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { Header } from './components/Header';
+import { Footer } from './components/public/Footer';
+import { AuthModal } from './components/auth/AuthModal';
+import { PropertyExplorer } from './components/public/PropertyExplorer';
+import { ServiceCatalogView } from './components/public/ServiceCatalogView';
+import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
+import { OwnerDashboard } from './components/owner/OwnerDashboard';
+import { ProviderDashboard } from './components/provider/ProviderDashboard';
+import { TenantDashboard } from './components/tenant/TenantDashboard';
 import { Shield } from 'lucide-react';
 
 function MainContent() {
